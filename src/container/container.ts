@@ -3,12 +3,15 @@ import LogicError from '../errors/logic-error';
 import {
     Container as ContainerContract,
     ContainerAbstract,
+    ContainerAfterResolvingFunction,
+    ContainerBeforeResolvingFunction,
     ContainerBinding,
     ContainerClass,
     ContainerConcrete,
     ContainerConcreteFunction,
     ContainerExtendFunction,
     ContainerFactory,
+    ContainerKeyValParameters,
     ContainerNewable,
     ContainerParameters,
     ContainerReboundFunction,
@@ -19,9 +22,10 @@ import {
     ContextualImplementation,
     ReflectionParameter
 } from '../types';
-import { arrayWrap, getParameterClassName, isFunctionConstructor, unwrapIfClosure } from '../utils';
+import { arrayWrap, dontTrapProperty, getParameterClass, isFunctionConstructor, unwrapIfClosure } from '../utils';
 import ContextualBindingBuilder from './contextual-binding-builder';
 
+declare type AfterResolvingMap = Map<ContainerAbstract, ContainerAfterResolvingFunction[]>;
 declare type ResolvingMap = Map<ContainerAbstract, ContainerResolvingFunction[]>;
 
 class Container implements ContainerContract {
@@ -37,19 +41,80 @@ class Container implements ContainerContract {
     protected tagsMap: Map<ContainerTag, ContainerAbstract[]> = new Map();
     protected reboundCallbacksMap: Map<ContainerAbstract, ContainerReboundFunction[]> = new Map();
     protected with: ContainerParameters[] = [];
-    protected globalAfterResolvingCallbacks: ContainerResolvingFunction[] = [];
-    protected globalBeforeResolvingCallbacks: ContainerResolvingFunction[] = [];
+    protected globalAfterResolvingCallbacks: ContainerAfterResolvingFunction[] = [];
+    protected globalBeforeResolvingCallbacks: ContainerBeforeResolvingFunction[] = [];
     protected globalResolvingCallbacks: ContainerResolvingFunction[] = [];
-    protected afterResolvingCallbacksMap: ResolvingMap = new Map();
-    protected beforeResolvingCallbacksMap: ResolvingMap = new Map();
+    protected afterResolvingCallbacksMap: AfterResolvingMap = new Map();
+    protected beforeResolvingCallbacksMap: Map<ContainerAbstract, ContainerBeforeResolvingFunction[]> = new Map();
     protected resolvingCallbacksMap: ResolvingMap = new Map();
     protected contextualMap: Map<ContainerNewable, Map<ContextualAbstract, ContextualImplementation>> = new Map();
     protected buildStack: ContainerNewable[] = [];
 
+    constructor() {
+        let magicHasIsEnabled = true;
+        return new Proxy(this, {
+            get(target, p, receiver) {
+                magicHasIsEnabled = false;
+                const exists = Reflect.has(target, p);
+                magicHasIsEnabled = true;
+
+                if (exists || dontTrapProperty(p)) {
+                    return Reflect.get(target, p, receiver);
+                }
+                return target.make.call(receiver, p as string);
+            },
+            has(target, p): boolean {
+                if (!magicHasIsEnabled || dontTrapProperty(p)) {
+                    return Reflect.has(target, p);
+                }
+
+                if (Reflect.has(target, p)) {
+                    return true;
+                } else {
+                    return target.bound(p as string);
+                }
+            },
+            set(target, p, newValue, receiver): boolean {
+                magicHasIsEnabled = false;
+                const exists = Reflect.has(target, p);
+                magicHasIsEnabled = true;
+
+                if (exists || dontTrapProperty(p)) {
+                    return Reflect.set(target, p, newValue, receiver);
+                }
+
+                target.bind.call(
+                    receiver,
+                    p as string,
+                    typeof newValue === 'function' && !isFunctionConstructor(newValue)
+                        ? newValue
+                        : function () {
+                              return newValue;
+                          }
+                );
+
+                return true;
+            },
+            deleteProperty(target, p): boolean {
+                magicHasIsEnabled = false;
+                const exists = Reflect.has(target, p);
+                magicHasIsEnabled = true;
+
+                if (exists || dontTrapProperty(p)) {
+                    return Reflect.deleteProperty(target, p);
+                }
+
+                target.bindingsMap.delete(p as string);
+                target.instancesMap.delete(p as string);
+                target.resolvedMap.delete(p as string);
+
+                return true;
+            }
+        });
+    }
+
     /**
      * Define a contextual binding.
-     *
-     * @param  array|string  $concrete
      */
     public when(concrete: ContainerNewable | ContainerNewable[]): ContextualBindingBuilderContract {
         const aliases = arrayWrap<ContainerNewable>(concrete);
@@ -87,7 +152,10 @@ class Container implements ContainerContract {
      * Determine if a given type is shared.
      */
     public isShared(abstract: ContainerAbstract): boolean {
-        return this.bindingsMap.has(abstract) ? (this.bindingsMap.get(abstract) as ContainerBinding).shared : false;
+        return (
+            this.instancesMap.has(abstract) ||
+            (this.bindingsMap.has(abstract) ? (this.bindingsMap.get(abstract) as ContainerBinding).shared : false)
+        );
     }
 
     /**
@@ -163,7 +231,7 @@ class Container implements ContainerContract {
             if (abstract === concrete) {
                 return this.build<T>(concrete);
             }
-            return this.resolve<T>(concrete, parameters, true);
+            return this.resolve<T>(concrete, parameters, false);
         };
     }
 
@@ -334,7 +402,6 @@ class Container implements ContainerContract {
 
         for (const [abstract, aliases] of this.abstractAliasesMap.entries()) {
             const filtered = aliases.filter(alias => alias !== searched);
-            console.log(aliases, filtered);
             this.abstractAliasesMap.set(abstract, filtered);
         }
     }
@@ -342,7 +409,12 @@ class Container implements ContainerContract {
     /**
      * Assign a set of tags to a given binding.
      */
-    public tag(abstracts: ContainerAbstract | ContainerAbstract[], ...tags: ContainerTag[]): void {
+    public tag(
+        abstracts: ContainerAbstract | ContainerAbstract[],
+        tags: ContainerTag[] | ContainerTag,
+        ...others: ContainerTag[]
+    ): void {
+        tags = (Array.isArray(tags) ? tags : [tags]).concat(others);
         for (const tag of tags) {
             const availableTags = this.tagsMap.has(tag) ? (this.tagsMap.get(tag) as ContainerAbstract[]) : [];
             for (const abstract of Array.isArray(abstracts) ? abstracts : [abstracts]) {
@@ -382,16 +454,14 @@ class Container implements ContainerContract {
 
     /**
      * Bind a new callback to an abstract's rebind event.
-     *
-     * @param  string  $abstract
-     * @param  \Closure  $callback
-     * @return mixed
      */
     public rebinding<T>(abstract: ContainerAbstract<T>, callback: ContainerReboundFunction): T | undefined {
         abstract = this.getAlias<T>(abstract);
         const callbacks = (this.reboundCallbacksMap.get(abstract) as ContainerReboundFunction[]) ?? [];
 
         callbacks.push(callback);
+
+        this.reboundCallbacksMap.set(abstract, callbacks);
 
         if (this.bound(abstract)) {
             return this.make<T>(abstract);
@@ -403,7 +473,7 @@ class Container implements ContainerContract {
      */
     public refresh<T>(abstract: ContainerAbstract<T>, target: any, method: string | symbol): T | undefined {
         return this.rebinding<T>(abstract, (container: ContainerContract, instance: any) => {
-            target.method(instance);
+            target[method](instance);
         });
     }
 
@@ -445,8 +515,15 @@ class Container implements ContainerContract {
     /**
      * Get a closure to resolve the given type from the container.
      */
-    public factory<T>(abstract: ContainerNewable<T>): ContainerFactory<T> {
+    public factory<T>(abstract: ContainerAbstract<T>): ContainerFactory<T> {
         return () => this.make<T>(abstract);
+    }
+
+    /**
+     * An alias function name for make().
+     */
+    public makeWith<T>(abstract: ContainerAbstract<T>, parameters: ContainerParameters): T {
+        return this.make<T>(abstract, parameters);
     }
 
     /**
@@ -507,7 +584,7 @@ class Container implements ContainerContract {
         // If we defined any extenders for this type, we'll need to spin through them
         // and apply them to the object being built. This allows for the extension
         // of services, such as changing configuration or decorating the object.
-        for (const extender of this.extendersMap.get(abstract) ?? []) {
+        for (const extender of this.getExtenders(abstract) ?? []) {
             object = extender(object, this);
         }
 
@@ -596,8 +673,17 @@ class Container implements ContainerContract {
         // try to get metadata from reflection
         // if design:paramdefinitions does not exists
         // constructable decorator is not invoked
-        if (!Reflect.hasMetadata('design:paramdefinitions', concrete)) {
-            throw new BindingResolutionError(`Target class [${concrete.name}] must be decorate with constructable!`);
+        try {
+            if (!Reflect.hasMetadata('design:paramdefinitions', concrete)) {
+                throw new BindingResolutionError(
+                    `Target class [${concrete.name}] must be decorate with constructable!`
+                );
+            }
+        } catch (error) {
+            if (error instanceof BindingResolutionError) {
+                throw error;
+            }
+            throw this.notInstantiable(concrete);
         }
 
         //    try {
@@ -656,13 +742,22 @@ class Container implements ContainerContract {
         let results: any[] = [];
 
         for (const dependency of dependencies) {
-            if (this.hasParameterOverride(dependency)) {
-                results.push(this.getParameterOverride(dependency));
+            const hasParameterNamedOverride = this.hasParameterNamedOverride(dependency);
+
+            if (hasParameterNamedOverride) {
+                results.push(this.getParameterNamedOverride(dependency));
                 continue;
             }
 
+            if (!hasParameterNamedOverride && getParameterClass(dependency) === null) {
+                if (this.hasParameterArrayOverride(dependency)) {
+                    results.push(this.getParameterArrayOverride(dependency));
+                    continue;
+                }
+            }
+
             const result =
-                getParameterClassName(dependency) === null
+                getParameterClass(dependency) === null
                     ? this.resolvePrimitive(dependency)
                     : this.resolveClass(dependency);
 
@@ -677,24 +772,48 @@ class Container implements ContainerContract {
     }
 
     /**
-     * Determine if the given dependency has a parameter override.
+     * Determine if the given dependency has a named parameter override.
      */
-    protected hasParameterOverride(dependency: ReflectionParameter): boolean {
-        return dependency.name in this.getLastParameterOverride();
+    protected hasParameterNamedOverride(dependency: ReflectionParameter): boolean {
+        const parameters = this.getLastParameterOverride();
+        if (Array.isArray(parameters)) {
+            return false;
+        }
+        return dependency.name in parameters;
     }
 
     /**
-     * Get a parameter override for a dependency.
+     * Determine if the given dependency has an array parameter override.
      */
-    protected getParameterOverride(dependency: ReflectionParameter): any {
-        return this.getLastParameterOverride()[dependency.name];
+    protected hasParameterArrayOverride(dependency: ReflectionParameter): boolean {
+        const parameters = this.getLastParameterOverride();
+        if (Array.isArray(parameters)) {
+            return parameters.length > 0;
+        }
+        return false;
+    }
+
+    /**
+     * Get named parameter override for a dependency.
+     */
+    protected getParameterNamedOverride(dependency: ReflectionParameter): any {
+        const parameters = this.getLastParameterOverride() as ContainerKeyValParameters;
+        return parameters[dependency.name];
+    }
+
+    /**
+     * Get array parameter override for a dependency.
+     */
+    protected getParameterArrayOverride(dependency: ReflectionParameter): any {
+        const parameters = this.getLastParameterOverride() as any[];
+        return parameters.shift();
     }
 
     /**
      * Get the last parameter override.
      */
     protected getLastParameterOverride(): ContainerParameters {
-        return this.with.length > 0 ? this.with[this.with.length - 1] : [];
+        return this.with.length > 0 ? this.with[this.with.length - 1] : {};
     }
 
     /**
@@ -713,7 +832,7 @@ class Container implements ContainerContract {
             return [];
         }
         throw new BindingResolutionError(
-            `Unresolvable dependency resolving [${parameter.name}] in class ${parameter.className}`
+            `Unresolvable dependency resolving [[Parameter #${parameter.index} [ <required> ${parameter.name} ]] in class ${parameter.className}.`
         );
     }
 
@@ -724,7 +843,7 @@ class Container implements ContainerContract {
         try {
             return parameter.isVariadic
                 ? this.resolveVariadicClass(parameter)
-                : this.make(getParameterClassName(parameter));
+                : this.make(getParameterClass(parameter));
         } catch (error) {
             // If we can not resolve the class instance, we will check to see if the value
             // is optional, and if it is we will return the optional parameter value as
@@ -748,7 +867,7 @@ class Container implements ContainerContract {
      * Resolve a class based variadic dependency from the container.
      */
     protected resolveVariadicClass(parameter: ReflectionParameter): any[] {
-        const className = getParameterClassName(parameter);
+        const className = getParameterClass(parameter);
 
         const abstract = this.getAlias(className);
         const concrete = this.getContextualConcrete(abstract);
@@ -763,25 +882,39 @@ class Container implements ContainerContract {
     }
 
     /**
+     * Throw an exception that the concrete is not instantiable.
+     */
+    protected notInstantiable<T>(concrete: ContainerConcrete<T>): BindingResolutionError {
+        if (this.buildStack.length > 0) {
+            const previous = this.buildStack.map(item => item.name).join(', ');
+
+            return new BindingResolutionError(
+                `Target [${concrete.toString()}] is not instantiable while building [${previous}].`
+            );
+        }
+        return new BindingResolutionError(`Target [${concrete.toString()}] is not instantiable.`);
+    }
+
+    /**
      * Register a new before resolving callback for all types.
      */
-    public beforeResolving(callback: ContainerResolvingFunction): void;
-    public beforeResolving(abstract: ContainerAbstract, callback: ContainerResolvingFunction): void;
+    public beforeResolving(callback: ContainerBeforeResolvingFunction): void;
+    public beforeResolving(abstract: ContainerAbstract, callback: ContainerBeforeResolvingFunction): void;
     public beforeResolving(
-        abstractOrCallback: ContainerAbstract | ContainerResolvingFunction,
-        callback: ContainerResolvingFunction | null = null
+        abstractOrCallback: ContainerAbstract | ContainerBeforeResolvingFunction,
+        callback: ContainerBeforeResolvingFunction | null = null
     ): void {
         if (typeof abstractOrCallback === 'string') {
             abstractOrCallback = this.getAlias(abstractOrCallback);
         }
         if (typeof abstractOrCallback === 'function' && callback === null) {
-            this.globalBeforeResolvingCallbacks.push(abstractOrCallback as ContainerResolvingFunction);
+            this.globalBeforeResolvingCallbacks.push(abstractOrCallback as ContainerBeforeResolvingFunction);
         } else {
             const callbacks =
                 (this.beforeResolvingCallbacksMap.get(
                     abstractOrCallback as ContainerAbstract
-                ) as ContainerResolvingFunction[]) ?? [];
-            callbacks.push(callback as ContainerResolvingFunction);
+                ) as ContainerBeforeResolvingFunction[]) ?? [];
+            callbacks.push(callback as ContainerBeforeResolvingFunction);
             this.beforeResolvingCallbacksMap.set(abstractOrCallback as ContainerAbstract, callbacks);
         }
     }
@@ -813,23 +946,23 @@ class Container implements ContainerContract {
     /**
      * Register a new after resolving callback for all types.
      */
-    public afterResolving(callback: ContainerResolvingFunction): void;
-    public afterResolving(abstract: ContainerAbstract, callback: ContainerResolvingFunction): void;
+    public afterResolving(callback: ContainerAfterResolvingFunction): void;
+    public afterResolving(abstract: ContainerAbstract, callback: ContainerAfterResolvingFunction): void;
     public afterResolving(
-        abstractOrCallback: ContainerAbstract | ContainerResolvingFunction,
-        callback: ContainerResolvingFunction | null = null
+        abstractOrCallback: ContainerAbstract | ContainerAfterResolvingFunction,
+        callback: ContainerAfterResolvingFunction | null = null
     ): void {
         if (typeof abstractOrCallback === 'string') {
             abstractOrCallback = this.getAlias(abstractOrCallback);
         }
         if (typeof abstractOrCallback === 'function' && callback === null) {
-            this.globalAfterResolvingCallbacks.push(abstractOrCallback as ContainerResolvingFunction);
+            this.globalAfterResolvingCallbacks.push(abstractOrCallback as ContainerAfterResolvingFunction);
         } else {
             const callbacks =
                 (this.afterResolvingCallbacksMap.get(
                     abstractOrCallback as ContainerAbstract
-                ) as ContainerResolvingFunction[]) ?? [];
-            callbacks.push(callback as ContainerResolvingFunction);
+                ) as ContainerAfterResolvingFunction[]) ?? [];
+            callbacks.push(callback as ContainerAfterResolvingFunction);
             this.afterResolvingCallbacksMap.set(abstractOrCallback as ContainerAbstract, callbacks);
         }
     }
@@ -837,12 +970,15 @@ class Container implements ContainerContract {
     /**
      * Fire all of the before resolving callbacks.
      */
-    protected fireBeforeResolvingCallbacks(abstract: ContainerAbstract, parameters: ContainerParameters = {}): void {
+    protected fireBeforeResolvingCallbacks(abstract: ContainerAbstract, parameters: ContainerParameters): void {
         this.fireBeforeCallbackArray(abstract, parameters, this.globalBeforeResolvingCallbacks);
         for (const [abs, callbacks] of this.beforeResolvingCallbacksMap) {
             if (
                 abstract === abs ||
-                (typeof abstract === 'function' && typeof abs === 'function' && abstract.prototype instanceof abs)
+                (typeof abstract === 'function' && typeof abs === 'function' && abstract.prototype instanceof abs) ||
+                (typeof abs === 'string' &&
+                    typeof abstract === 'function' &&
+                    ((Reflect.getMetadata('design:interfaces', abstract) ?? []) as string[]).includes(abs))
             ) {
                 this.fireBeforeCallbackArray(abstract, parameters, callbacks);
             }
@@ -855,10 +991,10 @@ class Container implements ContainerContract {
     protected fireBeforeCallbackArray(
         abstract: ContainerAbstract,
         parameters: ContainerParameters,
-        callbacks: ContainerResolvingFunction[]
+        callbacks: ContainerBeforeResolvingFunction[]
     ): void {
         for (const fnToCall of callbacks) {
-            fnToCall(this, abstract, parameters);
+            fnToCall(abstract, parameters, this);
         }
     }
 
@@ -886,11 +1022,16 @@ class Container implements ContainerContract {
     protected getCallbacksForType(
         abstract: ContainerAbstract,
         obj: any,
-        callbacksPerType: ResolvingMap
-    ): ContainerResolvingFunction[] {
+        callbacksPerType: ResolvingMap | AfterResolvingMap
+    ): ContainerResolvingFunction[] | ContainerAfterResolvingFunction[] {
         let results: ContainerResolvingFunction[] = [];
         for (const [abs, callbacks] of callbacksPerType) {
-            if (abstract === abs || (typeof abs === 'function' && obj instanceof abs)) {
+            if (
+                abstract === abs ||
+                (typeof abs === 'function' && obj instanceof abs) ||
+                (typeof abs === 'string' &&
+                    ((Reflect.getMetadata('design:interfaces', obj.constructor) ?? []) as string[]).includes(abs))
+            ) {
                 results = results.concat(callbacks);
             }
         }
@@ -901,9 +1042,12 @@ class Container implements ContainerContract {
     /**
      * Fire an array of callbacks with an object.
      */
-    protected fireCallbackArray(object: any, callbacks: ContainerResolvingFunction[]): void {
+    protected fireCallbackArray(
+        object: any,
+        callbacks: ContainerResolvingFunction[] | ContainerAfterResolvingFunction[]
+    ): void {
         for (const fnToCall of callbacks) {
-            fnToCall(this, object);
+            fnToCall(object, this);
         }
     }
 
@@ -989,7 +1133,7 @@ class Container implements ContainerContract {
      * Get the globally available instance of the container.
      */
     public static getInstance(): ContainerContract {
-        if (this.instance === null) {
+        if (this.instance == null) {
             this.instance = new this();
         }
 

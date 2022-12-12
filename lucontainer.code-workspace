@@ -33,9 +33,6 @@
         }
     },
     "extensions": {
-        "recommendations": [
-            "esbenp.prettier-vscode",
-            "ms-vscode.vscode-typescript-next",
-        ]
+        "recommendations": ["esbenp.prettier-vscode", "ms-vscode.vscode-typescript-next"]
     }
 }

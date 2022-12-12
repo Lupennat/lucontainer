@@ -1,30 +1,9 @@
 import { expect } from 'chai';
 import Container, { constructable, inject } from '../../src/index';
-import { Container as ContainerContract } from '../../src/types';
+import CircularAStub from '../stubs/circular-a-stub';
 after(async () => {
     Container.setInstance(null);
 });
-
-// @constructable()
-// class CircularAStub {
-//     public constructor(b: CircularBStub) {
-//         //
-//     }
-// }
-
-// @constructable()
-// class CircularBStub {
-//     public constructor(c: CircularCStub) {
-//         //
-//     }
-// }
-
-// @constructable()
-// class CircularCStub {
-//     public constructor(a: CircularAStub) {
-//         //
-//     }
-// }
 
 @constructable()
 class ContainerConcreteStub {
@@ -37,11 +16,6 @@ interface IContainerContractStub {
 
 @constructable()
 class ContainerImplementationStub implements IContainerContractStub {
-    //
-}
-
-@constructable()
-class ContainerImplementationStubTwo implements IContainerContractStub {
     //
 }
 
@@ -66,19 +40,28 @@ class ContainerMixedPrimitiveStub {
 }
 
 @constructable()
-class ContainerInjectVariableStub {
+class ContainerInjectVariableStubWithInterfaceImplementation implements IContainerContractStub {
     public constructor(concrete: ContainerConcreteStub, public something: any) {}
 }
 
 @constructable()
-class ContainerInjectVariableStubWithInterfaceImplementation implements IContainerContractStub {
-    public constructor(concrete: ContainerConcreteStub, public something: any) {}
+class Refreshable {
+    constructor(@inject('IContainerContractStub') public concrete: IContainerContractStub) {}
+    public setConcrete(concrete: IContainerContractStub) {
+        this.concrete = concrete;
+        return this;
+    }
+}
+
+@constructable()
+class ContainerImplementationStubTwo implements IContainerContractStub {
+    //
 }
 
 describe('Container', () => {
     it('Works Singleton', () => {
         const container = Container.setInstance(new Container());
-        Container.setInstance(null);
+        Container.setInstance();
         const container2 = Container.getInstance();
         expect(container2).to.be.instanceOf(Container);
         expect(container === container2).to.false;
@@ -232,6 +215,10 @@ describe('Container', () => {
             // @ts-expect-error
             container.bind(ContainerConcreteStub, concrete);
         }).throw('concrete should be a closure or a class, "object" given');
+
+        expect(() => {
+            container.bind('IContainerContractStub');
+        }).throw('please provide a concrete for abstract IContainerContractStub');
     });
 
     it('Works Abstract To Concrete Resolution', () => {
@@ -251,499 +238,515 @@ describe('Container', () => {
 
     it('Works Container Is Passed To Resolvers', () => {
         const container = new Container();
-        container.bind('something', (container: ContainerContract) => {
+        container.bind('something', container => {
             return container;
         });
         const c = container.make<Container>('something');
+
         expect(c === container).to.be.true;
     });
+
+    it('Works Proxy Handlers', () => {
+        let container = new Container() as Container & { [key: string]: any };
+        expect('something' in container).to.be.false;
+        container.something = () => {
+            return 'foo';
+        };
+        expect('something' in container).to.be.true;
+        expect(container.something).to.not.undefined;
+        delete container.something;
+        expect('something' in container).to.be.false;
+
+        //test proxy set when it's not a closure
+        container = new Container() as Container & { [key: string]: any };
+        container.something = 'text';
+        expect('something' in container).to.be.true;
+        expect(container.something).to.not.undefined;
+        expect(container.something).to.eq('text');
+        delete container.something;
+        expect('something' in container).to.be.false;
+
+        container.toJSON = () => {
+            return 'toJSON isReserved it does not register a binding';
+        };
+        expect('toJSON' in container).to.be.true;
+        expect(container.toJSON).to.not.eq('toJSON isReserved it does not register a binding');
+        expect(JSON.stringify(container)).to.eq('"toJSON isReserved it does not register a binding"');
+    });
+
+    it('Works Aliases', () => {
+        const container = new Container() as Container & { [key: string]: any };
+        container.foo = 'bar';
+        container.alias('foo', 'baz');
+        container.alias('baz', 'bat');
+        expect(container.make('foo') === 'bar').to.be.true;
+        expect(container.make('baz') === 'bar').to.be.true;
+        expect(container.make('bat') === 'bar').to.be.true;
+    });
+
+    it('Aliases Fails Loudly With Invalid Arguments', () => {
+        const container = new Container() as Container & { [key: string]: any };
+        container.foo = 'bar';
+        expect(() => {
+            container.alias('foo', 'foo');
+        }).throw('[foo] is aliased to itself');
+    });
+
+    it('Works Aliases With Array Of Parameters', () => {
+        const container = new Container();
+
+        container.bind('foo', (container, parameters) => {
+            return parameters;
+        });
+        container.alias('foo', 'baz');
+
+        expect(container.make<number[]>('baz', [1, 2, 3])).to.eql([1, 2, 3]);
+
+        @constructable()
+        class Test {
+            constructor(
+                public a: number,
+                public b: number,
+                public c: number,
+                @inject('NotValidBinding') public d: number = 4
+            ) {}
+        }
+
+        const resolved = container.make(Test, [1, 2, 3]);
+        expect(resolved.a).to.eq(1);
+        expect(resolved.b).to.eq(2);
+        expect(resolved.c).to.eq(3);
+        // because has default it doesn't throw an error even if 'NotValidBinding' doesn't exists
+        expect(resolved.d).to.eq(4);
+    });
+
+    it('Works Bindings Can Be Overriden', () => {
+        const container = new Container() as Container & { [key: string]: any };
+
+        container.foo = 'bar';
+        container.foo = 'baz';
+
+        expect(container.foo).to.eq('baz');
+    });
+
+    it('Works Binding An Instance Returns The Instance', () => {
+        const container = new Container();
+
+        const bound = new (class {})();
+        const resolved = container.instance('foo', bound);
+
+        expect(resolved === bound).to.be.true;
+    });
+
+    it('Works Binding An Instance As Shared', () => {
+        const container = new Container();
+
+        const bound = new (class {})();
+        container.instance('foo', bound);
+        const obj = container.make('foo');
+
+        expect(obj === bound).to.be.true;
+    });
+
+    it('Works Binding An Existing Instance Remove Aliases', () => {
+        const container = new Container();
+
+        const bound = new (class {})();
+        container.instance('test', bound);
+        container.alias('test', 'foo');
+        container.alias('foo', 'bar');
+
+        let obj = container.make('test');
+        expect(obj === bound).to.be.true;
+        obj = container.make('foo');
+        expect(obj === bound).to.be.true;
+        obj = container.make('bar');
+        expect(obj === bound).to.be.true;
+
+        const rebound = new (class {})();
+        container.instance('foo', rebound);
+
+        obj = container.make('test');
+        expect(bound === obj).to.be.true;
+        obj = container.make('foo');
+        expect(bound === obj).to.be.false;
+        expect(rebound === obj).to.be.true;
+        obj = container.make('bar');
+        expect(obj === rebound).to.be.true;
+    });
+
+    it('Works Resolution Of Default Parameters', () => {
+        const container = new Container();
+        const instance = container.make(ContainerDefaultValueStub);
+        expect(instance.stub).to.be.instanceOf(ContainerConcreteStub);
+        expect(instance.defaultValue).to.eq('claudio');
+    });
+
+    it('Works Bound', () => {
+        let container = new Container();
+        container.bind(ContainerConcreteStub, () => {
+            return undefined;
+        });
+        expect(container.bound(ContainerConcreteStub)).to.be.true;
+        expect(container.bound('IContainerContractStub')).to.be.false;
+
+        container = new Container();
+        container.bind('IContainerContractStub', ContainerConcreteStub);
+        expect(container.bound('IContainerContractStub')).to.be.true;
+        expect(container.bound(ContainerConcreteStub)).to.be.false;
+    });
+
+    it('Works Proxy Delete Remove Bound Instances', () => {
+        const container = new Container() as Container & { [key: string]: any };
+        container.instance('object', new (class {})());
+        delete container.object;
+
+        expect(container.bound('object')).to.be.false;
+    });
+
+    it('Works Bound Instance And Alias Check Via Proxy', () => {
+        const container = new Container() as Container & { [key: string]: any };
+        container.instance('object', new (class {})());
+        container.alias('object', 'alias');
+        expect('object' in container).to.be.true;
+        expect('alias' in container).to.be.true;
+    });
+
+    it('Works Rebound Listeners', () => {
+        let rebind = false;
+        const container = new Container();
+        container.bind('foo', () => {
+            return undefined;
+        });
+        container.rebinding('foo', () => {
+            rebind = true;
+        });
+        container.bind('foo', () => {
+            return undefined;
+        });
+        expect(rebind).to.be.true;
+    });
+
+    it('Works Rebound Listeners On Instances', () => {
+        let rebind = false;
+        const container = new Container();
+        container.bind('foo', () => {
+            return undefined;
+        });
+        container.rebinding('foo', () => {
+            rebind = true;
+        });
+        container.instance('foo', () => {
+            return undefined;
+        });
+        expect(rebind).to.be.true;
+    });
+
+    it('Works Rebound Listeners On Instances Only Fires If Was Already Bound', () => {
+        let rebind = false;
+        const container = new Container();
+
+        container.rebinding('foo', () => {
+            rebind = true;
+        });
+        container.instance('foo', () => {
+            return undefined;
+        });
+        expect(rebind).to.be.false;
+    });
+
+    it('Works Internal Class With Default Parameters', () => {
+        const container = new Container();
+        expect(() => {
+            container.make(ContainerMixedPrimitiveStub);
+        }).to.throw(
+            'Unresolvable dependency resolving [[Parameter #0 [ <required> first ]] in class ContainerMixedPrimitiveStub'
+        );
+    });
+
+    it('Throw Binding Resolution Error Message', () => {
+        const container = new Container();
+        expect(() => {
+            container.make('IContainerContractStub');
+        }).to.throw('Target [IContainerContractStub] is not instantiable.');
+    });
+
+    it('Throw Binding Resolution Error Message Includes Build Stack', () => {
+        const container = new Container();
+        expect(() => {
+            container.make(ContainerDependentStub);
+        }).to.throw('Target [IContainerContractStub] is not instantiable while building [ContainerDependentStub].');
+    });
+
+    it('ForgetInstance Forgets Instance', () => {
+        const container = new Container();
+        const containerConcreteStub = new ContainerConcreteStub();
+        container.instance(ContainerConcreteStub, containerConcreteStub);
+        expect(container.isShared(ContainerConcreteStub)).to.be.true;
+        container.forgetInstance(ContainerConcreteStub);
+        expect(container.isShared(ContainerConcreteStub)).to.be.false;
+    });
+
+    it('ForgetInstances Forgets All Instances', () => {
+        const container = new Container();
+        const containerConcreteStub1 = new ContainerConcreteStub();
+        const containerConcreteStub2 = new ContainerConcreteStub();
+        const containerConcreteStub3 = new ContainerConcreteStub();
+        container.instance('Instance1', containerConcreteStub1);
+        container.instance('Instance2', containerConcreteStub2);
+        container.instance('Instance3', containerConcreteStub3);
+        expect(container.isShared('Instance1')).to.be.true;
+        expect(container.isShared('Instance2')).to.be.true;
+        expect(container.isShared('Instance3')).to.be.true;
+        container.forgetInstances();
+        expect(container.isShared('Instance1')).to.be.false;
+        expect(container.isShared('Instance2')).to.be.false;
+        expect(container.isShared('Instance3')).to.be.false;
+    });
+
+    it('Flush Flushes All Bindings Aliases And Resolved Instances', () => {
+        const container = new Container();
+        container.bind(
+            'ConcreteStub',
+            () => {
+                return new ContainerConcreteStub();
+            },
+            true
+        );
+        container.alias('ConcreteStub', 'ContainerConcreteStub');
+        container.make('ConcreteStub');
+        expect(container.resolved('ConcreteStub')).to.be.true;
+        expect(container.isAlias('ContainerConcreteStub')).to.be.true;
+        expect(container.getBindings().has('ConcreteStub')).to.be.true;
+        expect(container.isShared('ConcreteStub')).to.be.true;
+        container.flush();
+        expect(container.resolved('ConcreteStub')).to.be.false;
+        expect(container.isAlias('ContainerConcreteStub')).to.be.false;
+        expect(container.getBindings().has('ConcreteStub')).to.be.false;
+        expect(container.isShared('ConcreteStub')).to.be.false;
+    });
+
+    it('Works Resolved Resolves Alias To Binding Name Before Checking', () => {
+        const container = new Container();
+        container.bind(
+            'ConcreteStub',
+            () => {
+                return new ContainerConcreteStub();
+            },
+            true
+        );
+        container.alias('ConcreteStub', 'foo');
+        expect(container.resolved('ConcreteStub')).to.be.false;
+        expect(container.resolved('foo')).to.be.false;
+
+        container.make('ConcreteStub');
+        expect(container.resolved('ConcreteStub')).to.be.true;
+        expect(container.resolved('foo')).to.be.true;
+    });
+
+    it('Works GetAlias', () => {
+        const container = new Container();
+        container.alias('ConcreteStub', 'foo');
+        expect(container.getAlias('foo')).to.eq('ConcreteStub');
+    });
+
+    it('Works GetAlias Recursive', () => {
+        const container = new Container();
+        container.alias('ConcreteStub', 'foo');
+        container.alias('foo', 'bar');
+        container.alias('bar', 'baz');
+        expect(container.getAlias('baz')).to.eq('ConcreteStub');
+        expect(container.isAlias('baz')).to.be.true;
+        expect(container.isAlias('bar')).to.be.true;
+        expect(container.isAlias('foo')).to.be.true;
+    });
+
+    it('Throws Error When Abstract is Same As Alias', () => {
+        const container = new Container();
+        expect(() => {
+            container.alias('name', 'name');
+        }).to.throw('[name] is aliased to itself.');
+    });
+
+    it('Works Container Get Factory', () => {
+        const container = new Container();
+        container.bind('name', () => {
+            return 'claudio';
+        });
+        const factory = container.factory('name');
+        expect(container.make('name')).to.eq(factory());
+    });
+
+    it('Works Container Get Factory', () => {
+        const container = new Container();
+        container.bind('name', () => {
+            return 'claudio';
+        });
+        const factory = container.factory('name');
+        expect(container.make('name')).to.eq(factory());
+    });
+
+    it('Works Make With Method Is An Alias For Make Method', () => {
+        const container = new Container();
+        container.bind('name', () => {
+            return 'claudio';
+        });
+        const factory = container.factory('name');
+        expect(container.make('name')).to.eq(factory());
+    });
+
+    it('Works Resolving With Array Of Parameters', () => {
+        const container = new Container();
+        container.bind('foo', (container, parameters) => {
+            return parameters;
+        });
+
+        expect(container.makeWith('foo', [1, 2, 3])).to.eql([1, 2, 3]);
+    });
+
+    it('Works Resolving With Parameters Object', () => {
+        const container = new Container();
+        const instance = container.makeWith(ContainerDefaultValueStub, { defaultValue: 'alberto' });
+        expect(instance.defaultValue).to.eq('alberto');
+    });
+
+    it('Works Resolving With Mixed Parameters Object', () => {
+        const container = new Container();
+        const instance = container.makeWith(ContainerMixedPrimitiveStub, { first: 1, last: 2, third: 3 });
+        expect(instance.first).to.eq(1);
+        expect(instance.stub).to.be.instanceOf(ContainerConcreteStub);
+        expect(instance.last).to.eq(2);
+        expect('third' in instance).to.be.false;
+    });
+
+    it('Works Resolving With Using An Interface', () => {
+        const container = new Container();
+        container.bind('IContainerContractStub', ContainerInjectVariableStubWithInterfaceImplementation);
+        const instance = container.make<ContainerInjectVariableStubWithInterfaceImplementation>(
+            'IContainerContractStub',
+            { something: 'tada' }
+        );
+        expect(instance.something).to.eq('tada');
+    });
+
+    it('Works Nested Parameter Override', () => {
+        const container = new Container();
+        container.bind('foo', container => {
+            return container.make('bar', { name: 'claudio' });
+        });
+        container.bind('bar', (container, parameters) => {
+            return parameters;
+        });
+        expect(container.make('foo', ['something'])).to.eql({ name: 'claudio' });
+    });
+
+    it('Works Nested Parameters Are Rest For Fresh Make', () => {
+        const container = new Container();
+        container.bind('foo', container => {
+            return container.make('bar');
+        });
+        container.bind('bar', (container, parameters) => {
+            return parameters;
+        });
+        expect(container.make('foo', ['something'])).to.eql({});
+    });
+
+    it('Singleton Bindings Not Respected With Make Parameters', () => {
+        const container = new Container();
+        container.singleton('foo', (container, parameters) => {
+            return parameters;
+        });
+        expect(container.make('foo', { name: 'claudio' })).to.eql({ name: 'claudio' });
+        expect(container.make('foo', { name: 'alberto' })).to.eql({ name: 'alberto' });
+    });
+
+    it('Can Build Without Parameter Stack With No Constructors', () => {
+        const container = new Container();
+        expect(container.build(ContainerConcreteStub)).to.be.instanceOf(ContainerConcreteStub);
+    });
+
+    it('Can Build Without Parameter Stack With Constructors', () => {
+        const container = new Container();
+        container.bind('IContainerContractStub', ContainerImplementationStub);
+        expect(container.build(ContainerDependentStub)).to.be.instanceOf(ContainerDependentStub);
+    });
+
+    it('Knows Entry', () => {
+        const container = new Container();
+        container.bind('IContainerContractStub', ContainerImplementationStub);
+        expect(container.has('IContainerContractStub')).to.be.true;
+    });
+
+    it('Can Bind Any Word', () => {
+        const container = new Container();
+        @constructable()
+        class Test {}
+
+        container.bind('Claudio', Test);
+        expect(container.get('Claudio')).to.be.instanceOf(Test);
+    });
+
+    it('Can Resolve Classes', () => {
+        const container = new Container();
+        const obj = container.get(ContainerConcreteStub);
+        expect(obj).to.be.instanceOf(ContainerConcreteStub);
+    });
+
+    it('Not Constructable Classes Throw Errors', () => {
+        const container = new Container();
+
+        class Test {}
+
+        container.bind('Claudio', Test);
+        expect(() => {
+            container.get('Claudio');
+        }).throw('Target class [Test] must be decorate with constructable!');
+    });
+
+    it('Can Dynamically Set Service', () => {
+        const container = new Container() as Container & { [key: string]: any };
+        expect('name' in container).to.be.false;
+        container.name = 'Claudio';
+        expect('name' in container).to.be.true;
+        expect(container.name).to.eq('Claudio');
+    });
+
+    it('Unknown Entry Throws Error', () => {
+        const container = new Container();
+        expect(() => {
+            container.get('Claudio');
+        }).throw('Target [Claudio] is not instantiable.');
+    });
+
+    it('Can Catch Circular Dependency', () => {
+        const container = new Container();
+        expect(() => {
+            container.get(CircularAStub);
+        }).throw(
+            'Unresolvable dependency resolving [[Parameter #0 [ <required> a ]] in class CircularCStub inside circular dependency.'
+        );
+    });
+
+    it('Works Refresh', () => {
+        const container = new Container();
+        container.bind('IContainerContractStub', ContainerImplementationStubTwo);
+        const instance = container.make(Refreshable);
+        container.refresh('IContainerContractStub', instance, 'setConcrete');
+        expect(instance.concrete).to.be.instanceOf(ContainerImplementationStubTwo);
+
+        container.bind('IContainerContractStub', ContainerImplementationStub);
+        expect(instance.concrete).to.be.instanceOf(ContainerImplementationStub);
+    });
+
+    it('Works Set', () => {
+        const container = new Container();
+        container.set('foo', [1, 2, 3]);
+        expect(container.make('foo')).to.eql([1, 2, 3]);
+        container.set('foo', ContainerImplementationStub);
+        expect(container.make('foo')).to.be.instanceOf(ContainerImplementationStub);
+        container.set('foo', () => {
+            return 'foo';
+        });
+        expect(container.make('foo')).to.eq('foo');
+    });
 });
-
-// <?php
-
-// namespace Illuminate\Tests\Container;
-
-// use Illuminate\Container\Container;
-// use Illuminate\Container\EntryNotFoundException;
-// use Illuminate\Contracts\Container\BindingResolutionException;
-// use PHPUnit\Framework\TestCase;
-// use Psr\Container\ContainerExceptionInterface;
-// use stdClass;
-// use TypeError;
-
-// class ContainerTest extends TestCase
-// {
-
-//     public function testContainerIsPassedToResolvers()
-//     {
-//         $container = new Container;
-//         $container->bind('something', function ($c) {
-//             return $c;
-//         });
-//         $c = $container->make('something');
-//         $this->assertSame($c, $container);
-//     }
-
-//     public function testArrayAccess()
-//     {
-//         $container = new Container;
-//         $this->assertFalse(isset($container['something']));
-//         $container['something'] = function () {
-//             return 'foo';
-//         };
-//         $this->assertTrue(isset($container['something']));
-//         $this->assertNotEmpty($container['something']);
-//         $this->assertSame('foo', $container['something']);
-//         unset($container['something']);
-//         $this->assertFalse(isset($container['something']));
-
-//         //test offsetSet when it's not instanceof Closure
-//         $container = new Container;
-//         $container['something'] = 'text';
-//         $this->assertTrue(isset($container['something']));
-//         $this->assertNotEmpty($container['something']);
-//         $this->assertSame('text', $container['something']);
-//         unset($container['something']);
-//         $this->assertFalse(isset($container['something']));
-//     }
-
-//     public function testAliases()
-//     {
-//         $container = new Container;
-//         $container['foo'] = 'bar';
-//         $container->alias('foo', 'baz');
-//         $container->alias('baz', 'bat');
-//         $this->assertSame('bar', $container->make('foo'));
-//         $this->assertSame('bar', $container->make('baz'));
-//         $this->assertSame('bar', $container->make('bat'));
-//     }
-
-//     public function testAliasesWithArrayOfParameters()
-//     {
-//         $container = new Container;
-//         $container->bind('foo', function ($app, $config) {
-//             return $config;
-//         });
-//         $container->alias('foo', 'baz');
-//         $this->assertEquals([1, 2, 3], $container->make('baz', [1, 2, 3]));
-//     }
-
-//     public function testBindingsCanBeOverridden()
-//     {
-//         $container = new Container;
-//         $container['foo'] = 'bar';
-//         $container['foo'] = 'baz';
-//         $this->assertSame('baz', $container['foo']);
-//     }
-
-//     public function testBindingAnInstanceReturnsTheInstance()
-//     {
-//         $container = new Container;
-
-//         $bound = new stdClass;
-//         $resolved = $container->instance('foo', $bound);
-
-//         $this->assertSame($bound, $resolved);
-//     }
-
-//     public function testBindingAnInstanceAsShared()
-//     {
-//         $container = new Container;
-//         $bound = new stdClass;
-//         $container->instance('foo', $bound);
-//         $object = $container->make('foo');
-//         $this->assertSame($bound, $object);
-//     }
-
-//     public function testResolutionOfDefaultParameters()
-//     {
-//         $container = new Container;
-//         $instance = $container->make(ContainerDefaultValueStub::class);
-//         $this->assertInstanceOf(ContainerConcreteStub::class, $instance->stub);
-//         $this->assertSame('taylor', $instance->default);
-//     }
-
-//     public function testBound()
-//     {
-//         $container = new Container;
-//         $container->bind(ContainerConcreteStub::class, function () {
-//             //
-//         });
-//         $this->assertTrue($container->bound(ContainerConcreteStub::class));
-//         $this->assertFalse($container->bound(IContainerContractStub::class));
-
-//         $container = new Container;
-//         $container->bind(IContainerContractStub::class, ContainerConcreteStub::class);
-//         $this->assertTrue($container->bound(IContainerContractStub::class));
-//         $this->assertFalse($container->bound(ContainerConcreteStub::class));
-//     }
-
-//     public function testUnsetRemoveBoundInstances()
-//     {
-//         $container = new Container;
-//         $container->instance('object', new stdClass);
-//         unset($container['object']);
-
-//         $this->assertFalse($container->bound('object'));
-//     }
-
-//     public function testBoundInstanceAndAliasCheckViaArrayAccess()
-//     {
-//         $container = new Container;
-//         $container->instance('object', new stdClass);
-//         $container->alias('object', 'alias');
-
-//         $this->assertTrue(isset($container['object']));
-//         $this->assertTrue(isset($container['alias']));
-//     }
-
-//     public function testReboundListeners()
-//     {
-//         unset($_SERVER['__test.rebind']);
-
-//         $container = new Container;
-//         $container->bind('foo', function () {
-//             //
-//         });
-//         $container->rebinding('foo', function () {
-//             $_SERVER['__test.rebind'] = true;
-//         });
-//         $container->bind('foo', function () {
-//             //
-//         });
-
-//         $this->assertTrue($_SERVER['__test.rebind']);
-//     }
-
-//     public function testReboundListenersOnInstances()
-//     {
-//         unset($_SERVER['__test.rebind']);
-
-//         $container = new Container;
-//         $container->instance('foo', function () {
-//             //
-//         });
-//         $container->rebinding('foo', function () {
-//             $_SERVER['__test.rebind'] = true;
-//         });
-//         $container->instance('foo', function () {
-//             //
-//         });
-
-//         $this->assertTrue($_SERVER['__test.rebind']);
-//     }
-
-//     public function testReboundListenersOnInstancesOnlyFiresIfWasAlreadyBound()
-//     {
-//         $_SERVER['__test.rebind'] = false;
-
-//         $container = new Container;
-//         $container->rebinding('foo', function () {
-//             $_SERVER['__test.rebind'] = true;
-//         });
-//         $container->instance('foo', function () {
-//             //
-//         });
-
-//         $this->assertFalse($_SERVER['__test.rebind']);
-//     }
-
-//     public function testInternalClassWithDefaultParameters()
-//     {
-//         $this->expectException(BindingResolutionException::class);
-//         $this->expectExceptionMessage('Unresolvable dependency resolving [Parameter #0 [ <required> $first ]] in class Illuminate\Tests\Container\ContainerMixedPrimitiveStub');
-
-//         $container = new Container;
-//         $container->make(ContainerMixedPrimitiveStub::class, []);
-//     }
-
-//     public function testBindingResolutionExceptionMessage()
-//     {
-//         $this->expectException(BindingResolutionException::class);
-//         $this->expectExceptionMessage('Target [Illuminate\Tests\Container\IContainerContractStub] is not instantiable.');
-
-//         $container = new Container;
-//         $container->make(IContainerContractStub::class, []);
-//     }
-
-//     public function testBindingResolutionExceptionMessageIncludesBuildStack()
-//     {
-//         $this->expectException(BindingResolutionException::class);
-//         $this->expectExceptionMessage('Target [Illuminate\Tests\Container\IContainerContractStub] is not instantiable while building [Illuminate\Tests\Container\ContainerDependentStub].');
-
-//         $container = new Container;
-//         $container->make(ContainerDependentStub::class, []);
-//     }
-
-//     public function testBindingResolutionExceptionMessageWhenClassDoesNotExist()
-//     {
-//         $this->expectException(BindingResolutionException::class);
-//         $this->expectExceptionMessage('Target class [Foo\Bar\Baz\DummyClass] does not exist.');
-
-//         $container = new Container;
-//         $container->build('Foo\Bar\Baz\DummyClass');
-//     }
-
-//     public function testForgetInstanceForgetsInstance()
-//     {
-//         $container = new Container;
-//         $containerConcreteStub = new ContainerConcreteStub;
-//         $container->instance(ContainerConcreteStub::class, $containerConcreteStub);
-//         $this->assertTrue($container->isShared(ContainerConcreteStub::class));
-//         $container->forgetInstance(ContainerConcreteStub::class);
-//         $this->assertFalse($container->isShared(ContainerConcreteStub::class));
-//     }
-
-//     public function testForgetInstancesForgetsAllInstances()
-//     {
-//         $container = new Container;
-//         $containerConcreteStub1 = new ContainerConcreteStub;
-//         $containerConcreteStub2 = new ContainerConcreteStub;
-//         $containerConcreteStub3 = new ContainerConcreteStub;
-//         $container->instance('Instance1', $containerConcreteStub1);
-//         $container->instance('Instance2', $containerConcreteStub2);
-//         $container->instance('Instance3', $containerConcreteStub3);
-//         $this->assertTrue($container->isShared('Instance1'));
-//         $this->assertTrue($container->isShared('Instance2'));
-//         $this->assertTrue($container->isShared('Instance3'));
-//         $container->forgetInstances();
-//         $this->assertFalse($container->isShared('Instance1'));
-//         $this->assertFalse($container->isShared('Instance2'));
-//         $this->assertFalse($container->isShared('Instance3'));
-//     }
-
-//     public function testContainerFlushFlushesAllBindingsAliasesAndResolvedInstances()
-//     {
-//         $container = new Container;
-//         $container->bind('ConcreteStub', function () {
-//             return new ContainerConcreteStub;
-//         }, true);
-//         $container->alias('ConcreteStub', 'ContainerConcreteStub');
-//         $container->make('ConcreteStub');
-//         $this->assertTrue($container->resolved('ConcreteStub'));
-//         $this->assertTrue($container->isAlias('ContainerConcreteStub'));
-//         $this->assertArrayHasKey('ConcreteStub', $container->getBindings());
-//         $this->assertTrue($container->isShared('ConcreteStub'));
-//         $container->flush();
-//         $this->assertFalse($container->resolved('ConcreteStub'));
-//         $this->assertFalse($container->isAlias('ContainerConcreteStub'));
-//         $this->assertEmpty($container->getBindings());
-//         $this->assertFalse($container->isShared('ConcreteStub'));
-//     }
-
-//     public function testResolvedResolvesAliasToBindingNameBeforeChecking()
-//     {
-//         $container = new Container;
-//         $container->bind('ConcreteStub', function () {
-//             return new ContainerConcreteStub;
-//         }, true);
-//         $container->alias('ConcreteStub', 'foo');
-
-//         $this->assertFalse($container->resolved('ConcreteStub'));
-//         $this->assertFalse($container->resolved('foo'));
-
-//         $container->make('ConcreteStub');
-
-//         $this->assertTrue($container->resolved('ConcreteStub'));
-//         $this->assertTrue($container->resolved('foo'));
-//     }
-
-//     public function testGetAlias()
-//     {
-//         $container = new Container;
-//         $container->alias('ConcreteStub', 'foo');
-//         $this->assertSame('ConcreteStub', $container->getAlias('foo'));
-//     }
-
-//     public function testGetAliasRecursive()
-//     {
-//         $container = new Container;
-//         $container->alias('ConcreteStub', 'foo');
-//         $container->alias('foo', 'bar');
-//         $container->alias('bar', 'baz');
-//         $this->assertSame('ConcreteStub', $container->getAlias('baz'));
-//         $this->assertTrue($container->isAlias('baz'));
-//         $this->assertTrue($container->isAlias('bar'));
-//         $this->assertTrue($container->isAlias('foo'));
-//     }
-
-//     public function testItThrowsExceptionWhenAbstractIsSameAsAlias()
-//     {
-//         $this->expectException('LogicException');
-//         $this->expectExceptionMessage('[name] is aliased to itself.');
-
-//         $container = new Container;
-//         $container->alias('name', 'name');
-//     }
-
-//     public function testContainerGetFactory()
-//     {
-//         $container = new Container;
-//         $container->bind('name', function () {
-//             return 'Taylor';
-//         });
-
-//         $factory = $container->factory('name');
-//         $this->assertEquals($container->make('name'), $factory());
-//     }
-
-//     public function testMakeWithMethodIsAnAliasForMakeMethod()
-//     {
-//         $mock = $this->getMockBuilder(Container::class)
-//                      ->onlyMethods(['make'])
-//                      ->getMock();
-
-//         $mock->expects($this->once())
-//              ->method('make')
-//              ->with(ContainerDefaultValueStub::class, ['default' => 'laurence'])
-//              ->willReturn(new stdClass);
-
-//         $result = $mock->makeWith(ContainerDefaultValueStub::class, ['default' => 'laurence']);
-
-//         $this->assertInstanceOf(stdClass::class, $result);
-//     }
-
-//     public function testResolvingWithArrayOfParameters()
-//     {
-//         $container = new Container;
-//         $instance = $container->make(ContainerDefaultValueStub::class, ['default' => 'adam']);
-//         $this->assertSame('adam', $instance->default);
-
-//         $instance = $container->make(ContainerDefaultValueStub::class);
-//         $this->assertSame('taylor', $instance->default);
-
-//         $container->bind('foo', function ($app, $config) {
-//             return $config;
-//         });
-
-//         $this->assertEquals([1, 2, 3], $container->make('foo', [1, 2, 3]));
-//     }
-
-//     public function testResolvingWithArrayOfMixedParameters()
-//     {
-//         $container = new Container;
-//         $instance = $container->make(ContainerMixedPrimitiveStub::class, ['first' => 1, 'last' => 2, 'third' => 3]);
-//         $this->assertSame(1, $instance->first);
-//         $this->assertInstanceOf(ContainerConcreteStub::class, $instance->stub);
-//         $this->assertSame(2, $instance->last);
-//         $this->assertFalse(isset($instance->third));
-//     }
-
-//     public function testResolvingWithUsingAnInterface()
-//     {
-//         $container = new Container;
-//         $container->bind(IContainerContractStub::class, ContainerInjectVariableStubWithInterfaceImplementation::class);
-//         $instance = $container->make(IContainerContractStub::class, ['something' => 'laurence']);
-//         $this->assertSame('laurence', $instance->something);
-//     }
-
-//     public function testNestedParameterOverride()
-//     {
-//         $container = new Container;
-//         $container->bind('foo', function ($app, $config) {
-//             return $app->make('bar', ['name' => 'Taylor']);
-//         });
-//         $container->bind('bar', function ($app, $config) {
-//             return $config;
-//         });
-
-//         $this->assertEquals(['name' => 'Taylor'], $container->make('foo', ['something']));
-//     }
-
-//     public function testNestedParametersAreResetForFreshMake()
-//     {
-//         $container = new Container;
-
-//         $container->bind('foo', function ($app, $config) {
-//             return $app->make('bar');
-//         });
-
-//         $container->bind('bar', function ($app, $config) {
-//             return $config;
-//         });
-
-//         $this->assertEquals([], $container->make('foo', ['something']));
-//     }
-
-//     public function testSingletonBindingsNotRespectedWithMakeParameters()
-//     {
-//         $container = new Container;
-
-//         $container->singleton('foo', function ($app, $config) {
-//             return $config;
-//         });
-
-//         $this->assertEquals(['name' => 'taylor'], $container->make('foo', ['name' => 'taylor']));
-//         $this->assertEquals(['name' => 'abigail'], $container->make('foo', ['name' => 'abigail']));
-//     }
-
-//     public function testCanBuildWithoutParameterStackWithNoConstructors()
-//     {
-//         $container = new Container;
-//         $this->assertInstanceOf(ContainerConcreteStub::class, $container->build(ContainerConcreteStub::class));
-//     }
-
-//     public function testCanBuildWithoutParameterStackWithConstructors()
-//     {
-//         $container = new Container;
-//         $container->bind(IContainerContractStub::class, ContainerImplementationStub::class);
-//         $this->assertInstanceOf(ContainerDependentStub::class, $container->build(ContainerDependentStub::class));
-//     }
-
-//     public function testContainerKnowsEntry()
-//     {
-//         $container = new Container;
-//         $container->bind(IContainerContractStub::class, ContainerImplementationStub::class);
-//         $this->assertTrue($container->has(IContainerContractStub::class));
-//     }
-
-//     public function testContainerCanBindAnyWord()
-//     {
-//         $container = new Container;
-//         $container->bind('Taylor', stdClass::class);
-//         $this->assertInstanceOf(stdClass::class, $container->get('Taylor'));
-//     }
-
-//     public function testContainerCanDynamicallySetService()
-//     {
-//         $container = new Container;
-//         $this->assertFalse(isset($container['name']));
-//         $container['name'] = 'Taylor';
-//         $this->assertTrue(isset($container['name']));
-//         $this->assertSame('Taylor', $container['name']);
-//     }
-
-//     public function testUnknownEntryThrowsException()
-//     {
-//         $this->expectException(EntryNotFoundException::class);
-
-//         $container = new Container;
-//         $container->get('Taylor');
-//     }
-
-//     public function testBoundEntriesThrowsContainerExceptionWhenNotResolvable()
-//     {
-//         $this->expectException(ContainerExceptionInterface::class);
-
-//         $container = new Container;
-//         $container->bind('Taylor', IContainerContractStub::class);
-
-//         $container->get('Taylor');
-//     }
-
-//     public function testContainerCanResolveClasses()
-//     {
-//         $container = new Container;
-//         $class = $container->get(ContainerConcreteStub::class);
-
-//         $this->assertInstanceOf(ContainerConcreteStub::class, $class);
-//     }
-
-//     // public function testContainerCanCatchCircularDependency()
-//     // {
-//     //     $this->expectException(\Illuminate\Contracts\Container\CircularDependencyException::class);
-
-//     //     $container = new Container;
-//     //     $container->get(CircularAStub::class);
-//     // }
-// }

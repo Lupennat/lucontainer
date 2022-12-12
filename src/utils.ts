@@ -1,6 +1,6 @@
 import { parse } from 'acorn';
 import { types } from 'node:util';
-import ReflectionError from './errors/reflection-error';
+import CircularDependencyError from './errors/circular-dependency-error';
 import { ReflectionParameter } from './types';
 
 const builtinObjects = [
@@ -62,7 +62,7 @@ function beautifyString(str: string): string {
         .trim();
 }
 
-function acornParametersToStringParameters(acornParams: acorn.Node[], className: string = ''): ReflectionParameter[] {
+function acornParametersToStringParameters(acornParams: acorn.Node[], className: string): ReflectionParameter[] {
     const parameters: ReflectionParameter[] = [];
     for (let x = 0; x < acornParams.length; x++) {
         const acornParam = acornParams[x];
@@ -88,9 +88,21 @@ function acornParametersToStringParameters(acornParams: acorn.Node[], className:
                 left = acornParam.left;
                 // @ts-expect-error
                 right = acornParam.right;
-                param.name = left.type === 'ObjectPattern' ? 'Object' : left.name;
+                param.name = left.type === 'ObjectPattern' ? '[Destructured]' : left.name;
                 param.hasDefault = true;
-                param.rawDefaultValue = right.type === 'Literal' ? right.value : null;
+                param.rawDefaultValue = null;
+                if (right.type === 'Literal') {
+                    param.rawDefaultValue = right.value;
+                }
+
+                if (right.type === 'ArrayExpression') {
+                    param.rawDefaultValue = right.elements.length === 0 ? [] : null;
+                }
+
+                if (right.type === 'ObjectExpression') {
+                    param.rawDefaultValue = right.properties.length === 0 ? {} : null;
+                }
+
                 if (
                     (right.type === 'Literal' && right.raw === 'null') ||
                     (right.type === 'Identifier' && right.name === 'undefined')
@@ -104,11 +116,10 @@ function acornParametersToStringParameters(acornParams: acorn.Node[], className:
                 param.isVariadic = true;
                 break;
             case 'ObjectPattern':
-                param.name = 'Object';
+                param.name = '[Destructured]';
                 break;
-            default:
-                throw new ReflectionError(`Parameter Type ${acornParam.type} could not be processed`);
         }
+
         parameters.push(param);
     }
 
@@ -146,13 +157,16 @@ export function arrayWrap<T = undefined>(value: T | T[]): T[] {
  *
  * @todo improve when ECMASCRIPTdecorator stage3
  */
-export function getParameterClassName(parameter: ReflectionParameter): any {
-    if (parameter.type === undefined || builtinObjects.includes(parameter.type)) {
+export function getParameterClass(parameter: ReflectionParameter): any {
+    if (parameter.type == null || builtinObjects.includes(parameter.type)) {
         return null;
     }
 
-    // todo when type === this what will happen
-    // return type
+    if (typeof parameter.type !== 'function' && typeof parameter.type !== 'string') {
+        throw new CircularDependencyError(
+            `Unresolvable dependency resolving [[Parameter #${parameter.index} [ <required> ${parameter.name} ]] in class ${parameter.className} inside circular dependency.`
+        );
+    }
 
     return parameter.type;
 }
@@ -162,6 +176,23 @@ export function getParameterClassName(parameter: ReflectionParameter): any {
  */
 export function unwrapIfClosure(value: any, ...args: any): any {
     return typeof value === 'function' && !isFunctionConstructor(value) ? value(...args) : value;
+}
+
+/**
+ * Prevent catch reserved Properties
+ */
+export function dontTrapProperty(property: string | symbol): boolean {
+    return (
+        typeof property === 'symbol' ||
+        property.startsWith('#') ||
+        property === 'then' ||
+        property === 'catch' ||
+        property === 'finally' ||
+        property === 'arguments' ||
+        property === 'prototype' ||
+        property === 'constructor' ||
+        property === 'toJSON'
+    );
 }
 
 /**
@@ -179,49 +210,45 @@ export function getParametersDefinition(
     );
 
     if (types.isAsyncFunction(fn)) {
-        if (fnStr.startsWith('async ')) {
-            fnStr = fnStr.replace('async ', '');
-        }
+        fnStr = fnStr.replace('async', '').trim();
     }
 
     if (fnStr.startsWith('[')) {
-        const end = fnStr.indexOf(']');
-        const toReplace = fnStr.substring(0, end + 1);
-        fnStr = fnStr.replace(toReplace, fn.name !== '' ? fn.name : 'replaced');
+        const regex = /\](?=([^"']*"[^"']*")*[^"']*$)/g;
+        const end = regex.exec(fnStr) as RegExpExecArray;
+        const toReplace = fnStr.substring(0, end.index + 1);
+        fnStr = fnStr.replace(toReplace, 'replaced');
     }
 
     if (isConstructorFunction) {
-        try {
-            // class {} is not parsable
-            // try to make a stupid class replace
-            fnStr = fnStr.replace('class {', 'class ' + (className === '' ? 'anonymous' : className) + ' {');
+        // class {} is not parsable
+        // try to make a stupid class replace
+        fnStr = fnStr
+            .replace('class {', 'class ' + (className === '' ? 'anonymous' : className) + ' {')
+            .replace('class{', 'class ' + (className === '' ? 'anonymous' : className) + ' {');
 
-            const ast = parse(fnStr, { ecmaVersion: 2022 });
-            // @ts-expect-error
-            let node = ast.body[0];
+        // fn from variable should not have name
+        fnStr = fnStr.startsWith('function')
+            ? fnStr
+                  .replace('function(', 'function ' + fn.name + ' (')
+                  .replace('function (', 'function ' + fn.name + ' (')
+            : fnStr;
 
-            if (node.type === 'ClassDeclaration') {
-                node = node.body.body.find((node: any) => {
-                    return node.kind === 'constructor';
-                });
-                if (node != null) {
-                    node = node.value;
-                } else {
-                    node = { params: [] };
-                }
+        const ast = parse(fnStr, { ecmaVersion: 2022 });
+        // @ts-expect-error
+        let node = ast.body[0];
+
+        if (node.type === 'ClassDeclaration') {
+            node = node.body.body.find((node: any) => {
+                return node.kind === 'constructor';
+            });
+            if (node != null) {
+                node = node.value;
             } else {
-                if ((node.type as string) !== 'FunctionDeclaration') {
-                    throw new ReflectionError(
-                        'Expected FunctionDeclaration or ClassDeclaration got ' + (node.type as string)
-                    );
-                }
+                node = { params: [] };
             }
-
-            return acornParametersToStringParameters(node.params, className);
-        } catch (error) {
-            // native constructor raise error
-            return [];
         }
+        return acornParametersToStringParameters(node.params, className);
     }
 
     if (fn.name !== '') {
@@ -229,9 +256,6 @@ export function getParametersDefinition(
         const ast = parse(fnStr, { ecmaVersion: 2022 });
         // @ts-expect-error
         const node: any = ast.body[0];
-        if (node.type !== 'FunctionDeclaration') {
-            throw new ReflectionError('Expected FunctionDeclaration got ' + (node.type as string));
-        }
 
         return acornParametersToStringParameters(node.params, className);
     }
@@ -239,19 +263,8 @@ export function getParametersDefinition(
     const ast = parse('const t = ' + fnStr, { ecmaVersion: 2022 });
     // @ts-expect-error
     let node: any = ast.body[0];
-    if (node.type !== 'VariableDeclaration') {
-        throw new ReflectionError('Expected VariableDeclaration got ' + (node.type as string));
-    }
     node = node.declarations[0];
-    if (node.type !== 'VariableDeclarator') {
-        throw new ReflectionError('Expected VariableDeclarator got ' + (node.type as string));
-    }
     node = node.init;
-    if (node.type !== 'FunctionExpression' && node.type !== 'ArrowFunctionExpression') {
-        throw new ReflectionError(
-            'Expected FunctionExpression or ArrowFunctionExpression got ' + (node.type as string)
-        );
-    }
 
     return acornParametersToStringParameters(node.params, className);
 }

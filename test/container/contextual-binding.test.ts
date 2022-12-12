@@ -1,6 +1,5 @@
-import { constructable, inject } from '../../src/index';
-import Container from '../../src/index';
 import { expect } from 'chai';
+import Container, { constructable, inject } from '../../src/index';
 import { Config } from '../../src/types';
 
 interface IContainerContextContractStub {
@@ -523,32 +522,13 @@ describe('Contextual Binding', () => {
         expect(resolvedInstance.settings.password).to.eq('mustbe84');
         expect(resolvedInstance.settings.alias).to.eq('lupennat');
     });
+
+    it('Throw Logic Error When Give Is Called Without Need', () => {
+        const container = new Container();
+        container.when(ContainerTestContextInjectOne).needs('interface-stub').give('stub-1');
+
+        expect(() => {
+            container.when(ContainerTestContextInjectTwo).give(ContainerContextImplementationStubTwo);
+        }).throw('Please provide a need, before give!');
+    });
 });
-// {
-
-//     public function testContextualBindingGivesValuesFromConfigArray()
-//     {
-//         $container = new Container;
-
-//         $container->singleton('config', function () {
-//             return new Repository([
-//                 'test' => [
-//                     'username' => 'laravel',
-//                     'password' => 'hunter42',
-//                     'alias' => 'lumen',
-//                 ],
-//             ]);
-//         });
-
-//         $container
-//             ->when(ContainerTestContextInjectFromConfigArray::class)
-//             ->needs('$settings')
-//             ->giveConfig('test');
-
-//         $resolvedInstance = $container->make(ContainerTestContextInjectFromConfigArray::class);
-
-//         $this->assertSame('laravel', $resolvedInstance->settings['username']);
-//         $this->assertSame('hunter42', $resolvedInstance->settings['password']);
-//         $this->assertSame('lumen', $resolvedInstance->settings['alias']);
-//     }
-// }

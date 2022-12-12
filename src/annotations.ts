@@ -8,21 +8,19 @@ export function methodable() {
     ): TypedPropertyDescriptor<T> | undefined {
         const types = Reflect.getMetadata('design:paramtypes', target, propertyKey) ?? [];
         Reflect.defineMetadata('design:paramtypes', types, target, propertyKey);
-        const definitions = getParametersDefinition(
-            (target as any)[propertyKey] as Function,
-            'name' in target ? (target.name as string) : undefined
-        );
+        const definitions = getParametersDefinition((target as any)[propertyKey] as Function, target.constructor.name);
         Reflect.defineMetadata('design:paramdefinitions', definitions, target, propertyKey);
         return descriptor;
     };
 }
 
-export function constructable() {
+export function constructable(...interfaces: string[]) {
     return function <TFunction extends Function>(target: TFunction): TFunction | undefined {
         const types = Reflect.getMetadata('design:paramtypes', target) ?? [];
         Reflect.defineMetadata('design:paramtypes', types, target);
         const definitions = getParametersDefinition(target, target.name, true);
         Reflect.defineMetadata('design:paramdefinitions', definitions, target);
+        Reflect.defineMetadata('design:interfaces', interfaces, target);
         return target;
     };
 }
@@ -48,19 +46,22 @@ function decorate(
 }
 
 export function annotate(
-    target: Function,
-    propertyKeyOrParams: string | Symbol | any[] = [],
+    target: Function | Object,
+    propertyKeyOrInterfaces: string | Symbol | string[] = [],
     parameters: any[] = []
 ): Function | PropertyDescriptor {
-    if (typeof propertyKeyOrParams === 'string' || typeof propertyKeyOrParams === 'string') {
+    if (typeof propertyKeyOrInterfaces === 'string' || typeof propertyKeyOrInterfaces === 'string') {
         return decorate(
             [methodable(), Reflect.metadata('design:paramtypes', parameters)],
             target,
-            propertyKeyOrParams as string | symbol
+            propertyKeyOrInterfaces as string | symbol
         ) as PropertyDescriptor;
     } else {
         return decorate(
-            [constructable(), Reflect.metadata('design:paramtypes', propertyKeyOrParams as any[])],
+            [
+                constructable(...(propertyKeyOrInterfaces as string[])),
+                Reflect.metadata('design:paramtypes', parameters)
+            ],
             target
         ) as Function;
     }

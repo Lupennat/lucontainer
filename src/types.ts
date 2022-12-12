@@ -13,14 +13,16 @@ export type ContainerTag = string;
 export type ContainerClass<T = unknown> = new (...args: any[]) => T;
 export type ContainerNewable<T = unknown> = ContainerClass<T> | (abstract new (...args: any[]) => T);
 export type ContainerAbstract<T = unknown> = string | ContainerNewable<T>;
-export type ContainerConcreteFunction<T = unknown> = (container: Container, parameters?: ContainerParameters) => T;
+export type ContainerConcreteFunction<T = unknown> = (container: Container, parameters: ContainerParameters) => T;
 export type ContainerConcrete<T = unknown> = ContainerConcreteFunction<T> | ContainerNewable<T>;
-export type ContainerExtendFunction<T = unknown> = (container: Container, instance: any) => T;
-export type ContainerResolvingFunction<T = unknown> = (
-    container: Container,
+export type ContainerExtendFunction<T = unknown> = (instance: any, container: Container) => T;
+export type ContainerBeforeResolvingFunction<T = unknown> = (
     instance: any,
-    parameters?: ContainerParameters
+    parameters: ContainerParameters,
+    container: Container
 ) => T;
+export type ContainerResolvingFunction<T = unknown> = (instance: any, container: Container) => T;
+export type ContainerAfterResolvingFunction<T = unknown> = (instance: any, container: Container) => T;
 export type ContainerReboundFunction = (container: Container, instance: any) => void;
 export type ContainerWrappedFunction<T = unknown> = () => T;
 export type ContainerFactory<T = unknown> = () => T;
@@ -29,9 +31,12 @@ export type ContainerCallable<T = unknown> = ContainerNewable<T> | ContainerCall
 export type ContextualAbstract<T = unknown> = string | ContainerNewable<T>;
 export type ContextualImplementation = any;
 
-export interface ContainerParameters {
-    [key: string]: any;
+type NotArray<T = unknown> = T extends T[] ? never : T;
+export interface ContainerKeyValParameters {
+    [key: string]: NotArray;
 }
+
+export type ContainerParameters = ContainerKeyValParameters | any[];
 
 export interface ContainerBinding {
     concrete: ContainerConcreteFunction;
