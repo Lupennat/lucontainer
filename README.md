@@ -44,7 +44,7 @@ Lucontainer requires a modern JavaScript engine with support for:
 -   [Map](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Map)
 -   [Proxy](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Proxy)
 
-> **Warning** 
+> **Warning**
 > **The `reflect-metadata` polyfill should be imported only once in your entire application** because the Reflect object is meant to be a global singleton.
 
 # Introduction
@@ -111,7 +111,7 @@ container.bind(Transistor, function (app) {
 
 Note that we receive the container itself as an argument to the resolver. We can then use the container to resolve sub-dependencies of the object we are building.
 
-> **info**
+> **Note**
 > There is no need to bind classes into the container if they do not depend on any interfaces. The container does not need to be instructed on how to build these objects, since it can automatically resolve these objects using reflection.
 
 ### Binding A Singleton
@@ -140,7 +140,8 @@ container.scoped(Transistor, function (app) {
 });
 ```
 
-### Binding Instances
+### Binding Instances
+
 You may also bind an existing object instance into the container using the `instance` method. The given instance will always be returned on subsequent calls into the container:
 
 ```ts
@@ -154,7 +155,7 @@ container.instance(Transistor, function (app) {
 
 ## Binding Names To Implementations
 
-> **info**
+> **Note**
 > Interfaces Workaround
 > A very powerful feature of the service container is its ability to bind a name (you can't bind Typescript Interfaces) to a given implementation. For example, let's assume we have an `EventPusher` interface and a `RedisEventPusher` implementation. Once we have coded our `RedisEventPusher` implementation of this interface, we can register it with the service container like so:
 
@@ -186,7 +187,7 @@ class Test2 {
 }
 ```
 
-> **info**
+> **Note**
 > Named Binding cannot be Automatically Injected, you need to add @inject parameter decorator, in this way type of parameter will respect the original interface and the container can automatically inject the registered implementations.
 
 ## Contextual Binding
@@ -537,7 +538,7 @@ console.log(obj.impl instanceof ContainerImplementationStubTwo); // true
 
 Decorate Class And Function with `annotate` Function in order to be resolved by Lucontainer.
 
-> **info**
+> **Note**
 > @decorator in Typescript can not be used to decorate function, you must use annotate.
 
 Class or Function Constructor:
