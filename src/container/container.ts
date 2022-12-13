@@ -568,7 +568,7 @@ class Container implements ContainerContract {
         if (Array.isArray(fnToCall)) {
             const abstract = fnToCall[0];
             const method = fnToCall[1];
-            const isStatic = fnToCall[2];
+            const isStatic = fnToCall[2] as boolean;
 
             if (
                 (isStatic && (!(method in abstract) || typeof (abstract as any)[method] !== 'function')) ||
@@ -576,7 +576,7 @@ class Container implements ContainerContract {
             ) {
                 throw new Error(
                     `Target method [${fnToCall[0].name}.${
-                        !isStatic ? 'prototype.' : ''
+                        isStatic ? '' : 'prototype.'
                     }${fnToCall[1].toString()}] is not a function.`
                 );
             }
@@ -590,7 +590,7 @@ class Container implements ContainerContract {
             ) {
                 throw new BindingResolutionError(
                     `Target method [${fnToCall[0].name}.${
-                        !isStatic ? 'prototype.' : ''
+                        isStatic ? '' : 'prototype.'
                     }${fnToCall[1].toString()}] must be decorate with methodable!`
                 );
             }
@@ -1057,11 +1057,9 @@ class Container implements ContainerContract {
         } else {
             abstractOrCallback = this.getAlias(abstractOrCallback as ContainerAbstract);
             const callbacks =
-                (this.beforeResolvingCallbacksMap.get(
-                    abstractOrCallback as ContainerAbstract
-                ) as ContainerBeforeResolvingFunction[]) ?? [];
+                (this.beforeResolvingCallbacksMap.get(abstractOrCallback) as ContainerBeforeResolvingFunction[]) ?? [];
             callbacks.push(callback as ContainerBeforeResolvingFunction);
-            this.beforeResolvingCallbacksMap.set(abstractOrCallback as ContainerAbstract, callbacks);
+            this.beforeResolvingCallbacksMap.set(abstractOrCallback, callbacks);
         }
     }
 
@@ -1079,11 +1077,9 @@ class Container implements ContainerContract {
         } else {
             abstractOrCallback = this.getAlias(abstractOrCallback as ContainerAbstract);
             const callbacks =
-                (this.resolvingCallbacksMap.get(
-                    abstractOrCallback as ContainerAbstract
-                ) as ContainerResolvingFunction[]) ?? [];
+                (this.resolvingCallbacksMap.get(abstractOrCallback) as ContainerResolvingFunction[]) ?? [];
             callbacks.push(callback as ContainerResolvingFunction);
-            this.resolvingCallbacksMap.set(abstractOrCallback as ContainerAbstract, callbacks);
+            this.resolvingCallbacksMap.set(abstractOrCallback, callbacks);
         }
     }
 
@@ -1101,11 +1097,9 @@ class Container implements ContainerContract {
         } else {
             abstractOrCallback = this.getAlias(abstractOrCallback as ContainerAbstract);
             const callbacks =
-                (this.afterResolvingCallbacksMap.get(
-                    abstractOrCallback as ContainerAbstract
-                ) as ContainerAfterResolvingFunction[]) ?? [];
+                (this.afterResolvingCallbacksMap.get(abstractOrCallback) as ContainerAfterResolvingFunction[]) ?? [];
             callbacks.push(callback as ContainerAfterResolvingFunction);
-            this.afterResolvingCallbacksMap.set(abstractOrCallback as ContainerAbstract, callbacks);
+            this.afterResolvingCallbacksMap.set(abstractOrCallback, callbacks);
         }
     }
 
@@ -1120,7 +1114,9 @@ class Container implements ContainerContract {
                 (typeof abstract === 'function' && typeof abs === 'function' && abstract.prototype instanceof abs) ||
                 ((typeof abs === 'string' || typeof abs === 'symbol') &&
                     typeof abstract === 'function' &&
-                    ((Reflect.getMetadata('design:interfaces', abstract) ?? []) as (string | symbol)[]).includes(abs))
+                    ((Reflect.getMetadata('design:interfaces', abstract) ?? []) as Array<string | symbol>).includes(
+                        abs
+                    ))
             ) {
                 this.fireBeforeCallbackArray(abstract, parameters, callbacks);
             }
@@ -1172,9 +1168,9 @@ class Container implements ContainerContract {
                 abstract === abs ||
                 (typeof abs === 'function' && obj instanceof abs) ||
                 ((typeof abs === 'string' || typeof abs === 'symbol') &&
-                    ((Reflect.getMetadata('design:interfaces', obj.constructor) ?? []) as (string | symbol)[]).includes(
-                        abs
-                    ))
+                    (
+                        (Reflect.getMetadata('design:interfaces', obj.constructor) ?? []) as Array<string | symbol>
+                    ).includes(abs))
             ) {
                 results = results.concat(callbacks);
             }

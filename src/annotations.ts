@@ -14,7 +14,7 @@ export function methodable() {
     };
 }
 
-export function constructable(...interfaces: (string | Symbol)[]) {
+export function constructable(...interfaces: Array<string | Symbol>) {
     return function <TFunction extends Function>(target: TFunction): TFunction | undefined {
         const types = Reflect.getMetadata('design:paramtypes', target);
         Reflect.defineMetadata('design:paramtypes', types, target);
