@@ -72,7 +72,7 @@ function acornParametersToStringParameters(acornParams: acorn.Node[], className:
             isVariadic: false,
             allowsNull: false,
             hasDefault: false,
-            rawDefaultValue: null,
+            rawDefaultValue: undefined,
             index: x
         };
 
@@ -90,17 +90,17 @@ function acornParametersToStringParameters(acornParams: acorn.Node[], className:
                 right = acornParam.right;
                 param.name = left.type === 'ObjectPattern' ? '[Destructured]' : left.name;
                 param.hasDefault = true;
-                param.rawDefaultValue = null;
+                param.rawDefaultValue = undefined;
                 if (right.type === 'Literal') {
                     param.rawDefaultValue = right.value;
                 }
 
                 if (right.type === 'ArrayExpression') {
-                    param.rawDefaultValue = right.elements.length === 0 ? [] : null;
+                    param.rawDefaultValue = right.elements.length === 0 ? [] : undefined;
                 }
 
                 if (right.type === 'ObjectExpression') {
-                    param.rawDefaultValue = right.properties.length === 0 ? {} : null;
+                    param.rawDefaultValue = right.properties.length === 0 ? {} : undefined;
                 }
 
                 if (

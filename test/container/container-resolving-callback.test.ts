@@ -20,6 +20,12 @@ class ResolvingImplementationStubThree implements ResolvingContractStub {
 }
 
 @constructable()
+class AbstractClass {}
+
+@constructable()
+class ImplementAbstract extends AbstractClass {}
+
+@constructable()
 class Test {}
 
 describe('Container Resolving Callback', () => {
@@ -468,6 +474,22 @@ describe('Container Resolving Callback', () => {
         expect(callCounter).to.eq(1);
 
         container.make('ResolvingContractStub');
+        expect(callCounter).to.eq(2);
+
+        AbstractClass;
+        ImplementAbstract;
+
+        container.bind(AbstractClass);
+
+        callCounter = 0;
+        container.beforeResolving(AbstractClass, () => {
+            callCounter++;
+        });
+
+        container.make(ImplementAbstract);
+        expect(callCounter).to.eq(1);
+
+        container.make(AbstractClass);
         expect(callCounter).to.eq(2);
     });
 

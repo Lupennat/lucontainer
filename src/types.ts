@@ -4,7 +4,7 @@ export interface ReflectionParameter {
     isVariadic: boolean;
     allowsNull: boolean;
     hasDefault: boolean;
-    rawDefaultValue: null | any;
+    rawDefaultValue: undefined | any;
     index: number;
     type?: any;
 }
@@ -16,6 +16,15 @@ export type ContainerAbstract<T = unknown> = string | ContainerNewable<T>;
 export type ContainerConcreteFunction<T = unknown> = (container: Container, parameters: ContainerParameters) => T;
 export type ContainerConcrete<T = unknown> = ContainerConcreteFunction<T> | ContainerNewable<T>;
 export type ContainerExtendFunction<T = unknown> = (instance: any, container: Container) => T;
+/**
+ * [class, method, static]
+ */
+export type ContainerClassMethod<T = unknown> = [ContainerNewable<T>, string | symbol, boolean?];
+/**
+ * [object, method]
+ */
+export type ContainerInstanceMethod = [Object, string | symbol];
+export type ContainerMethodBindingFunction<T = unknown> = (instance: any, container: Container) => T;
 export type ContainerBeforeResolvingFunction<T = unknown> = (
     instance: any,
     parameters: ContainerParameters,
@@ -27,7 +36,10 @@ export type ContainerReboundFunction = (container: Container, instance: any) => 
 export type ContainerWrappedFunction<T = unknown> = () => T;
 export type ContainerFactory<T = unknown> = () => T;
 export type ContainerCallableFunction<T = unknown> = (...args: any[]) => T;
-export type ContainerCallable<T = unknown> = ContainerNewable<T> | ContainerCallableFunction<T>;
+export type ContainerCallable<T = unknown> =
+    | ContainerClassMethod<T>
+    | ContainerInstanceMethod
+    | ContainerCallableFunction<T>;
 export type ContextualAbstract<T = unknown> = string | ContainerNewable<T>;
 export type ContextualImplementation = any;
 

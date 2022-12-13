@@ -290,6 +290,12 @@ describe('Container', () => {
         expect(() => {
             container.alias('foo', 'foo');
         }).throw('[foo] is aliased to itself');
+
+        container.bind(ContainerConcreteStub);
+
+        expect(() => {
+            container.alias(ContainerConcreteStub, ContainerConcreteStub);
+        }).throw('[ContainerConcreteStub] is aliased to itself');
     });
 
     it('Works Aliases With Array Of Parameters', () => {

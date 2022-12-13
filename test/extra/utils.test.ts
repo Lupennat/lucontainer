@@ -477,8 +477,8 @@ describe('Util', () => {
         expect(params[1].rawDefaultValue).to.eq(1);
         expect(params[2].rawDefaultValue).to.eql([]);
         expect(params[3].rawDefaultValue).to.eql({});
-        expect(params[4].rawDefaultValue).to.eq(null);
-        expect(params[5].rawDefaultValue).to.eq(null);
+        expect(params[4].rawDefaultValue).to.eq(undefined);
+        expect(params[5].rawDefaultValue).to.eq(undefined);
     });
 
     it('Get Parameters Definition Can Define Parameters Allows Null On Default Null Or Undefined', () => {
@@ -502,7 +502,7 @@ describe('Util', () => {
         expect(params[0].index).to.eq(0);
         expect(params[0].isVariadic).to.be.false;
         expect(params[0].allowsNull).to.be.false;
-        expect(params[0].rawDefaultValue).to.eq(null);
+        expect(params[0].rawDefaultValue).to.eq(undefined);
         expect(params[0].hasDefault).to.be.true;
 
         params = getParametersDefinition(({ pretty }: { pretty: boolean }) => {});
@@ -510,7 +510,7 @@ describe('Util', () => {
         expect(params[0].index).to.eq(0);
         expect(params[0].isVariadic).to.be.false;
         expect(params[0].allowsNull).to.be.false;
-        expect(params[0].rawDefaultValue).to.eq(null);
+        expect(params[0].rawDefaultValue).to.eq(undefined);
         expect(params[0].hasDefault).to.be.false;
     });
 });

@@ -6,17 +6,22 @@ import {
     ContainerAfterResolvingFunction,
     ContainerBeforeResolvingFunction,
     ContainerBinding,
+    ContainerCallable,
+    ContainerCallableFunction,
     ContainerClass,
+    ContainerClassMethod,
     ContainerConcrete,
     ContainerConcreteFunction,
     ContainerExtendFunction,
     ContainerFactory,
     ContainerKeyValParameters,
+    ContainerMethodBindingFunction,
     ContainerNewable,
     ContainerParameters,
     ContainerReboundFunction,
     ContainerResolvingFunction,
     ContainerTag,
+    ContainerWrappedFunction,
     ContextualAbstract,
     ContextualBindingBuilder as ContextualBindingBuilderContract,
     ContextualImplementation,
@@ -27,6 +32,14 @@ import ContextualBindingBuilder from './contextual-binding-builder';
 
 declare type AfterResolvingMap = Map<ContainerAbstract, ContainerAfterResolvingFunction[]>;
 declare type ResolvingMap = Map<ContainerAbstract, ContainerResolvingFunction[]>;
+declare interface BindingMethods {
+    proto: {
+        [key: string | symbol]: ContainerMethodBindingFunction;
+    };
+    static: {
+        [key: string | symbol]: ContainerMethodBindingFunction;
+    };
+}
 
 class Container implements ContainerContract {
     protected static instance: ContainerContract | null = null;
@@ -49,6 +62,7 @@ class Container implements ContainerContract {
     protected resolvingCallbacksMap: ResolvingMap = new Map();
     protected contextualMap: Map<ContainerNewable, Map<ContextualAbstract, ContextualImplementation>> = new Map();
     protected buildStack: ContainerNewable[] = [];
+    protected methodBindingsMap: Map<ContainerNewable, BindingMethods> = new Map();
 
     constructor() {
         let magicHasIsEnabled = true;
@@ -204,20 +218,6 @@ class Container implements ContainerContract {
         if (this.resolved(abstract)) {
             this.rebound<T>(abstract);
         }
-
-        // if (isFunctionConstructor(concrete)) {
-        //     this.container
-        //         .bind<T>(abstract)
-        //         .to(concrete as interfaces.Newable<T>)
-        //         [shared ? 'inSingletonScope' : 'inTransientScope']();
-        // } else {
-        //     this.container
-        //         .bind<T>(abstract)
-        //         .toDynamicValue(() => {
-        //             return (concrete as FactoryFunction<T>)(this);
-        //         })
-        //         [shared ? 'inSingletonScope' : 'inTransientScope']();
-        // }
     }
 
     /**
@@ -235,55 +235,42 @@ class Container implements ContainerContract {
         };
     }
 
-    // /**
-    //  * Determine if the container has a method binding.
-    //  *
-    //  * @param  string  $method
-    //  * @return bool
-    //  */
-    //  public function hasMethodBinding($method)
-    //  {
-    //      return isset($this->methodBindings[$method]);
-    //  }
+    /**
+     * Determine if the container has a method binding.
+     */
+    public hasMethodBinding(method: ContainerClassMethod): boolean {
+        const isStatic = method[2] ?? false;
+        return (
+            this.methodBindingsMap.has(method[0]) &&
+            method[1] in (this.methodBindingsMap.get(method[0]) as BindingMethods)[isStatic ? 'static' : 'proto']
+        );
+    }
 
-    //  /**
-    //   * Bind a callback to resolve with Container::call.
-    //   *
-    //   * @param  array|string  $method
-    //   * @param  \Closure  $callback
-    //   * @return void
-    //   */
-    //  public function bindMethod($method, $callback)
-    //  {
-    //      $this->methodBindings[$this->parseBindMethod($method)] = $callback;
-    //  }
+    /**
+     * Bind a callback to resolve with Container.call.
+     */
+    public bindMethod<T>(method: ContainerClassMethod, callback: ContainerMethodBindingFunction<T>): void {
+        const isStatic = method[2] ?? false;
+        const methods = this.methodBindingsMap.get(method[0]) ?? {
+            proto: {},
+            static: {}
+        };
+        methods[isStatic ? 'static' : 'proto'][method[1]] = callback;
 
-    //  /**
-    //   * Get the method to be bound in class@method format.
-    //   *
-    //   * @param  array|string  $method
-    //   * @return string
-    //   */
-    //  protected function parseBindMethod($method)
-    //  {
-    //      if (is_array($method)) {
-    //          return $method[0].'@'.$method[1];
-    //      }
+        this.methodBindingsMap.set(method[0], methods);
+    }
 
-    //      return $method;
-    //  }
+    /**
+     * Get the method binding for the given method.
+     */
+    public callMethodBinding(method: ContainerClassMethod, instance: any): any {
+        const isStatic = method[2] ?? false;
+        const fnToCall = (this.methodBindingsMap.get(method[0]) as BindingMethods)[isStatic ? 'static' : 'proto'][
+            method[1]
+        ];
 
-    //  /**
-    //   * Get the method binding for the given method.
-    //   *
-    //   * @param  string  $method
-    //   * @param  mixed  $instance
-    //   * @return mixed
-    //   */
-    //  public function callMethodBinding($method, $instance)
-    //  {
-    //      return call_user_func($this->methodBindings[$method], $instance, $this);
-    //  }
+        return fnToCall(instance, this);
+    }
 
     /**
      * Add a contextual binding to the container.
@@ -496,21 +483,190 @@ class Container implements ContainerContract {
         return this.reboundCallbacksMap.get(abstract) ?? [];
     }
 
-    // /**
-    //  * Wrap the given closure such that its dependencies will be injected when executed.
-    //  */
-    // public wrap<T>(callback: ContainerCallableFunction<T>, parameters: any[] = []): ContainerWrappedFunction<T> {
-    //     return () => this.call<T>(callback, parameters);
-    // }
+    /**
+     * Wrap the given closure such that its dependencies will be injected when executed.
+     */
+    public wrap<T>(
+        callback: ContainerCallableFunction<T>,
+        parameters: ContainerParameters = {}
+    ): ContainerWrappedFunction<T> {
+        return () => this.call<T>(callback, parameters);
+    }
 
-    // /**
-    //  * Call the given Closure / class@method and inject its dependencies.
-    //  *
-    //  * @todo return T
-    //  */
-    // public call<T>(callback: ContainerCallable<T>, parameters: any[] = [], defaultMethod: string = ''): T {
-    //     // return BoundMethod::call($this, $callback, $parameters, $defaultMethod);
-    // }
+    /**
+     * Call the given Closure / [class, method] and inject its dependencies.
+     */
+    public call<T>(callback: ContainerCallable<T>, parameters: ContainerParameters = {}): any {
+        return this.callBoundMethod<T>(callback, this.getContainerCallableClosure<T>(callback, parameters));
+    }
+
+    /**
+     * Get the Closure to be used when buound a method.
+     */
+    protected getContainerCallableClosure<T>(
+        fnToCall: ContainerCallable<T>,
+        parameters: ContainerParameters
+    ): Function {
+        if (Array.isArray(fnToCall)) {
+            return (instance: { [key: string | symbol]: ContainerCallableFunction }) => {
+                const method = fnToCall[1];
+                const abstract = (
+                    typeof fnToCall[0] === 'function' ? fnToCall[0] : fnToCall[0].constructor
+                ) as ContainerNewable<T>;
+
+                return instance[method](
+                    ...this.getMethodDependencies([abstract, fnToCall[1], fnToCall[2] ?? false], parameters)
+                );
+            };
+        } else {
+            return () => {
+                return fnToCall(...this.getMethodDependencies(fnToCall, parameters));
+            };
+        }
+    }
+
+    /**
+     * Call a method that has been bound to the container.
+     */
+    protected callBoundMethod<T>(callback: ContainerCallable<T>, closure: Function): any {
+        if (!Array.isArray(callback)) {
+            return unwrapIfClosure(closure);
+        }
+
+        const method = callback[1];
+        const abstract = (
+            typeof callback[0] === 'function' ? callback[0] : callback[0].constructor
+        ) as ContainerNewable<T>;
+
+        const isStatic = typeof callback[0] === 'function' ? callback[2] ?? false : false;
+
+        const instance = (
+            typeof callback[0] === 'function' ? (isStatic ? abstract : this.make(abstract)) : callback[0]
+        ) as {
+            [key: string | symbol]: ContainerCallableFunction;
+        };
+
+        if (this.hasMethodBinding([abstract, method, isStatic])) {
+            return this.callMethodBinding([abstract, method, isStatic], instance);
+        }
+
+        return unwrapIfClosure(closure, instance);
+    }
+
+    /**
+     * Get all dependencies for a given method.
+     */
+    protected getMethodDependencies<T>(
+        fnToCall: ContainerClassMethod<T> | ContainerCallableFunction<T>,
+        parameters: ContainerParameters
+    ): any[] {
+        let types: any[] = [];
+        let dependencies: any[] = [];
+
+        if (Array.isArray(fnToCall)) {
+            const abstract = fnToCall[0];
+            const method = fnToCall[1];
+            const isStatic = fnToCall[2] ?? false;
+
+            if (
+                (isStatic && (!(method in abstract) || typeof (abstract as any)[method] !== 'function')) ||
+                (!isStatic && (!(method in abstract.prototype) || typeof abstract.prototype[method] !== 'function'))
+            ) {
+                throw new Error(
+                    `Target method [${fnToCall[0].name}.${
+                        !isStatic ? 'prototype.' : ''
+                    }${fnToCall[1].toString()}] is not a function.`
+                );
+            }
+
+            if (
+                !Reflect.hasMetadata(
+                    'design:paramdefinitions',
+                    isStatic ? fnToCall[0] : fnToCall[0].prototype,
+                    fnToCall[1]
+                )
+            ) {
+                throw new BindingResolutionError(
+                    `Target method [${fnToCall[0].name}.${
+                        !isStatic ? 'prototype.' : ''
+                    }${fnToCall[1].toString()}] must be decorate with methodable!`
+                );
+            }
+
+            types =
+                Reflect.getMetadata('design:paramtypes', isStatic ? fnToCall[0] : fnToCall[0].prototype, fnToCall[1]) ??
+                [];
+
+            dependencies = (
+                Reflect.getMetadata(
+                    'design:paramdefinitions',
+                    isStatic ? fnToCall[0] : fnToCall[0].prototype,
+                    fnToCall[1]
+                ) ?? []
+            ).map((definition: ReflectionParameter, index: number) => {
+                definition.type = types[index];
+                return definition;
+            });
+        } else {
+            if (!Reflect.hasMetadata('design:paramdefinitions', fnToCall)) {
+                throw new BindingResolutionError(`Target function [${fnToCall.name}] must be annotate!`);
+            }
+
+            types = Reflect.getMetadata('design:paramtypes', fnToCall) ?? [];
+
+            dependencies = (Reflect.getMetadata('design:paramdefinitions', fnToCall) ?? []).map(
+                (definition: ReflectionParameter, index: number) => {
+                    definition.type = types[index];
+                    return definition;
+                }
+            );
+        }
+
+        let resolvedParameters: any[] = [];
+
+        for (const dependency of dependencies) {
+            const res = this.getDependencyForCallParameter(dependency, parameters);
+            if (dependency.isVariadic && Array.isArray(res)) {
+                resolvedParameters = resolvedParameters.concat(res);
+            } else {
+                resolvedParameters.push(res);
+            }
+        }
+
+        return resolvedParameters.concat(Array.isArray(parameters) ? parameters : []);
+    }
+
+    /**
+     * Get the dependency for the given call parameter.
+     */
+    protected getDependencyForCallParameter(parameter: ReflectionParameter, parameters: ContainerParameters): any {
+        const name = parameter.name;
+        if (!Array.isArray(parameters)) {
+            if (name in parameters) {
+                return parameters[name];
+            } else if (getParameterClass(parameter) != null) {
+                const resolved = this.make(getParameterClass(parameter));
+                return parameter.isVariadic && !Array.isArray(resolved) ? [resolved] : resolved;
+            } else if (parameter.hasDefault) {
+                return undefined;
+            } else {
+                throw new BindingResolutionError(
+                    `Unresolvable dependency resolving [[Parameter #${parameter.index} [ <required> ${parameter.name} ]] in class ${parameter.className}.`
+                );
+            }
+        } else {
+            if (getParameterClass(parameter) != null) {
+                const resolved = this.make(getParameterClass(parameter));
+                return parameter.isVariadic && !Array.isArray(resolved) ? [resolved] : resolved;
+            } else if (parameter.hasDefault) {
+                return undefined;
+            } else {
+                throw new BindingResolutionError(
+                    `Unresolvable dependency resolving [[Parameter #${parameter.index} [ <required> ${parameter.name} ]] in class ${parameter.className}.`
+                );
+            }
+        }
+    }
 
     /**
      * Get a closure to resolve the given type from the container.
