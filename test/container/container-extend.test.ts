@@ -1,5 +1,5 @@
 import { expect } from 'chai';
-import Container, { constructable } from '../../src';
+import { constructable, Container } from '../../src';
 
 @constructable()
 class ContainerLazyExtendStub {

@@ -12,7 +12,7 @@ export interface ReflectionParameter {
 export type ContainerTag = string;
 export type ContainerClass<T = unknown> = new (...args: any[]) => T;
 export type ContainerNewable<T = unknown> = ContainerClass<T> | (abstract new (...args: any[]) => T);
-export type ContainerAbstract<T = unknown> = string | ContainerNewable<T>;
+export type ContainerAbstract<T = unknown> = string | symbol | ContainerNewable<T>;
 export type ContainerConcreteFunction<T = unknown> = (container: Container, parameters: ContainerParameters) => T;
 export type ContainerConcrete<T = unknown> = ContainerConcreteFunction<T> | ContainerNewable<T>;
 export type ContainerExtendFunction<T = unknown> = (instance: any, container: Container) => T;
@@ -40,7 +40,7 @@ export type ContainerCallable<T = unknown> =
     | ContainerClassMethod<T>
     | ContainerInstanceMethod
     | ContainerCallableFunction<T>;
-export type ContextualAbstract<T = unknown> = string | ContainerNewable<T>;
+export type ContextualAbstract<T = unknown> = string | symbol | ContainerNewable<T>;
 export type ContextualImplementation = any;
 
 type NotArray<T = unknown> = T extends T[] ? never : T;

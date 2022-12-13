@@ -1,5 +1,5 @@
 import { expect } from 'chai';
-import Container, { constructable, inject } from '../../src';
+import { constructable, Container, inject } from '../../src';
 
 interface TestInterface {}
 

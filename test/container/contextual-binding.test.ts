@@ -1,5 +1,5 @@
 import { expect } from 'chai';
-import Container, { constructable, inject } from '../../src/index';
+import { constructable, Container, inject } from '../../src/index';
 import { Config } from '../../src/types';
 
 interface IContainerContextContractStub {

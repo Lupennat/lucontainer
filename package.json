@@ -1,6 +1,6 @@
 {
     "name": "lucontainer",
-    "version": "0.0.1",
+    "version": "1.0.0",
     "description": "Service Container for Node js",
     "author": "Claudio Pennati <claudio.pennati@gmail.com>",
     "license": "MIT",
@@ -12,7 +12,14 @@
         "injection",
         "container",
         "service",
-        "ioc"
+        "ioc",
+        "di",
+        "javascript",
+        "typescript",
+        "node",
+        "dependency injection",
+        "dependency inversion",
+        "inversion of control container"
     ],
     "main": "./dist/index.js",
     "types": "./dist/types.d.ts",
@@ -58,13 +65,13 @@
         "eslint-plugin-promise": "^6.1.1",
         "mocha": "^10.1.0",
         "nyc": "^15.1.0",
+        "reflect-metadata": "^0.1.13",
         "safe-publish-latest": "^2.0.0",
         "sinon": "^15.0.0",
         "ts-node": "^10.9.1",
         "typescript": "^4.9.3"
     },
     "dependencies": {
-        "acorn": "^8.8.1",
-        "reflect-metadata": "^0.1.13"
+        "acorn": "^8.8.1"
     }
 }

@@ -1,5 +1,5 @@
 import { expect } from 'chai';
-import Container, { annotate, constructable, methodable } from '../../src';
+import { annotate, constructable, Container, methodable } from '../../src';
 
 function printAllArguments(args: IArguments, params: any[] = []) {
     for (let x = 0; x < params.length; x++) {
@@ -64,6 +64,10 @@ describe('Container Call', () => {
         expect(() => {
             container.call([ContainerTestCallStub, 'notexist']);
         }).throw('Target method [ContainerTestCallStub.prototype.notexist] is not a function.');
+
+        expect(() => {
+            container.call([ContainerTestCallStub, 'notexist', true]);
+        }).throw('Target method [ContainerTestCallStub.notexist] is not a function.');
     });
 
     it('Call Class Method Without Methodable Throws Error', () => {
@@ -72,10 +76,15 @@ describe('Container Call', () => {
         @constructable()
         class Test {
             notvalid() {}
+            static notvalid() {}
         }
         expect(() => {
             container.call([Test, 'notvalid']);
         }).throw('Target method [Test.prototype.notvalid] must be decorate with methodable!');
+
+        expect(() => {
+            container.call([Test, 'notvalid', true]);
+        }).throw('Target method [Test.notvalid] must be decorate with methodable!');
     });
 
     it('Call Class Method', () => {
@@ -227,7 +236,16 @@ describe('Container Call', () => {
         result = result();
 
         expect(result[0]).to.be.instanceOf(StdClass);
-        expect(result[1]).to.eql('claudio');
+        expect(result[1]).to.eq('claudio');
+
+        result = container.wrap(fnToCall);
+
+        expect(typeof result).to.eq('function');
+        expect(result === fnToCall).to.be.false;
+        result = result();
+
+        expect(result[0]).to.be.instanceOf(StdClass);
+        expect(result[1]).to.eql([]);
     });
 
     it('Works Call With Variadic Dependency', () => {
@@ -272,6 +290,29 @@ describe('Container Call', () => {
         expect(result[0]).to.be.instanceOf(ContainerCallConcreteStub);
         expect(result[1]).to.eq('claudio');
         expect(result[2]).to.be.instanceOf(ContainerTestCallStub);
+    });
+
+    it('Works Call Method Bindings', () => {
+        const container = new Container();
+        container.bindMethod([ContainerTestCallStub, 'unresolvable'], (stub: ContainerTestCallStub) => {
+            return stub.unresolvable('foo', 'bar');
+        });
+        const result = container.callMethodBinding(
+            [ContainerTestCallStub, 'unresolvable'],
+            new ContainerTestCallStub()
+        );
+        expect(result).to.eql(['foo', 'bar']);
+    });
+
+    it('Works Has Method Bindings', () => {
+        const container = new Container();
+        container.bindMethod([ContainerTestCallStub, 'unresolvable'], (stub: ContainerTestCallStub) => {
+            return stub.unresolvable('foo', 'bar');
+        });
+        let result = container.hasMethodBinding([ContainerTestCallStub, 'unresolvable']);
+        expect(result).to.be.true;
+        result = container.hasMethodBinding([ContainerTestCallStub, 'notbinded']);
+        expect(result).to.be.false;
     });
 
     it('Throw Error When Call Without Required Parameters', () => {

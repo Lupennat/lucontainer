@@ -1,5 +1,5 @@
 import { expect } from 'chai';
-import Container, { constructable } from '../../src';
+import { constructable, Container } from '../../src';
 
 interface ResolvingContractStub {
     //
@@ -476,9 +476,6 @@ describe('Container Resolving Callback', () => {
         container.make('ResolvingContractStub');
         expect(callCounter).to.eq(2);
 
-        AbstractClass;
-        ImplementAbstract;
-
         container.bind(AbstractClass);
 
         callCounter = 0;
@@ -490,6 +487,19 @@ describe('Container Resolving Callback', () => {
         expect(callCounter).to.eq(1);
 
         container.make(AbstractClass);
+        expect(callCounter).to.eq(2);
+
+        container.bind(Symbol.for('ResolvingContractStub'), ResolvingImplementationStub);
+
+        callCounter = 0;
+        container.beforeResolving(Symbol.for('ResolvingContractStub'), () => {
+            callCounter++;
+        });
+
+        container.make(ResolvingImplementationStub);
+        expect(callCounter).to.eq(1);
+
+        container.make(Symbol.for('ResolvingContractStub'));
         expect(callCounter).to.eq(2);
     });
 

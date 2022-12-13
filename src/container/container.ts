@@ -193,8 +193,8 @@ class Container implements ContainerContract {
         // abstract type. After that, the concrete type to be registered as shared
         // without being forced to state their classes in both of the parameters.
         if (concrete == null) {
-            if (typeof abstract === 'string') {
-                throw new Error(`please provide a concrete for abstract ${abstract}.`);
+            if (typeof abstract === 'string' || typeof abstract === 'symbol') {
+                throw new Error(`please provide a concrete for abstract ${abstract.toString()}.`);
             }
             concrete = abstract;
         }
@@ -227,7 +227,7 @@ class Container implements ContainerContract {
         abstract: ContainerAbstract<T>,
         concrete: ContainerNewable<T>
     ): ContainerConcreteFunction<T> {
-        return (container: ContainerContract, parameters: ContainerParameters = {}) => {
+        return (container: ContainerContract, parameters: ContainerParameters) => {
             if (abstract === concrete) {
                 return this.build<T>(concrete);
             }
@@ -427,7 +427,9 @@ class Container implements ContainerContract {
      */
     public alias(abstract: ContainerAbstract, alias: ContainerAbstract): void {
         if (alias === abstract) {
-            throw new LogicError(`[${typeof abstract === 'string' ? abstract : abstract.name}] is aliased to itself.`);
+            throw new LogicError(
+                `[${typeof abstract === 'function' ? abstract.name : abstract.toString()}] is aliased to itself.`
+            );
         }
 
         this.aliasesMap.set(alias, abstract);
@@ -561,12 +563,12 @@ class Container implements ContainerContract {
         parameters: ContainerParameters
     ): any[] {
         let types: any[] = [];
-        let dependencies: any[] = [];
+        let dependencies: ReflectionParameter[] = [];
 
         if (Array.isArray(fnToCall)) {
             const abstract = fnToCall[0];
             const method = fnToCall[1];
-            const isStatic = fnToCall[2] ?? false;
+            const isStatic = fnToCall[2];
 
             if (
                 (isStatic && (!(method in abstract) || typeof (abstract as any)[method] !== 'function')) ||
@@ -593,16 +595,16 @@ class Container implements ContainerContract {
                 );
             }
 
-            types =
-                Reflect.getMetadata('design:paramtypes', isStatic ? fnToCall[0] : fnToCall[0].prototype, fnToCall[1]) ??
-                [];
+            types = Reflect.getMetadata(
+                'design:paramtypes',
+                isStatic ? fnToCall[0] : fnToCall[0].prototype,
+                fnToCall[1]
+            );
 
-            dependencies = (
-                Reflect.getMetadata(
-                    'design:paramdefinitions',
-                    isStatic ? fnToCall[0] : fnToCall[0].prototype,
-                    fnToCall[1]
-                ) ?? []
+            dependencies = Reflect.getMetadata(
+                'design:paramdefinitions',
+                isStatic ? fnToCall[0] : fnToCall[0].prototype,
+                fnToCall[1]
             ).map((definition: ReflectionParameter, index: number) => {
                 definition.type = types[index];
                 return definition;
@@ -612,9 +614,9 @@ class Container implements ContainerContract {
                 throw new BindingResolutionError(`Target function [${fnToCall.name}] must be annotate!`);
             }
 
-            types = Reflect.getMetadata('design:paramtypes', fnToCall) ?? [];
+            types = Reflect.getMetadata('design:paramtypes', fnToCall);
 
-            dependencies = (Reflect.getMetadata('design:paramdefinitions', fnToCall) ?? []).map(
+            dependencies = Reflect.getMetadata('design:paramdefinitions', fnToCall).map(
                 (definition: ReflectionParameter, index: number) => {
                     definition.type = types[index];
                     return definition;
@@ -740,7 +742,7 @@ class Container implements ContainerContract {
         // If we defined any extenders for this type, we'll need to spin through them
         // and apply them to the object being built. This allows for the extension
         // of services, such as changing configuration or decorating the object.
-        for (const extender of this.getExtenders(abstract) ?? []) {
+        for (const extender of this.getExtenders(abstract)) {
             object = extender(object, this);
         }
 
@@ -786,7 +788,10 @@ class Container implements ContainerContract {
         // Next we need to see if a contextual binding might be bound under an alias of the
         // given abstract type. So, we will need to check if any aliases exist with this
         // type and then spin through them and check for contextual bindings on these.
-        if ((this.abstractAliasesMap.get(abstract) ?? []).length === 0) {
+        if (
+            this.abstractAliasesMap.has(abstract) &&
+            (this.abstractAliasesMap.get(abstract) as ContainerAbstract[]).length === 0
+        ) {
             return;
         }
 
@@ -842,24 +847,11 @@ class Container implements ContainerContract {
             throw this.notInstantiable(concrete);
         }
 
-        //    try {
-        //        $reflector = new ReflectionClass($concrete);
-        //    } catch (ReflectionException $e) {
-        //        throw new BindingResolutionException("Target class [$concrete] does not exist.", 0, $e);
-        //    }
-
-        //    // If the type is not instantiable, the developer is attempting to resolve
-        //    // an abstract type such as an Interface or Abstract Class and there is
-        //    // no binding registered for the abstractions so we need to bail out.
-        //    if (! $reflector->isInstantiable()) {
-        //        return $this->notInstantiable($concrete);
-        //    }
-
         this.buildStack.push(concrete as ContainerNewable<T>);
 
-        const types: any[] = Reflect.getMetadata('design:paramtypes', concrete) ?? [];
+        const types: any[] = Reflect.getMetadata('design:paramtypes', concrete);
 
-        const dependencies: any[] = (Reflect.getMetadata('design:paramdefinitions', concrete) ?? []).map(
+        const dependencies: any[] = Reflect.getMetadata('design:paramdefinitions', concrete).map(
             (definition: ReflectionParameter, index: number) => {
                 definition.type = types[index];
                 return definition;
@@ -1060,12 +1052,10 @@ class Container implements ContainerContract {
         abstractOrCallback: ContainerAbstract | ContainerBeforeResolvingFunction,
         callback: ContainerBeforeResolvingFunction | null = null
     ): void {
-        if (typeof abstractOrCallback === 'string') {
-            abstractOrCallback = this.getAlias(abstractOrCallback);
-        }
         if (typeof abstractOrCallback === 'function' && callback === null) {
             this.globalBeforeResolvingCallbacks.push(abstractOrCallback as ContainerBeforeResolvingFunction);
         } else {
+            abstractOrCallback = this.getAlias(abstractOrCallback as ContainerAbstract);
             const callbacks =
                 (this.beforeResolvingCallbacksMap.get(
                     abstractOrCallback as ContainerAbstract
@@ -1084,12 +1074,10 @@ class Container implements ContainerContract {
         abstractOrCallback: ContainerAbstract | ContainerResolvingFunction,
         callback: ContainerResolvingFunction | null = null
     ): void {
-        if (typeof abstractOrCallback === 'string') {
-            abstractOrCallback = this.getAlias(abstractOrCallback);
-        }
         if (typeof abstractOrCallback === 'function' && callback === null) {
             this.globalResolvingCallbacks.push(abstractOrCallback as ContainerResolvingFunction);
         } else {
+            abstractOrCallback = this.getAlias(abstractOrCallback as ContainerAbstract);
             const callbacks =
                 (this.resolvingCallbacksMap.get(
                     abstractOrCallback as ContainerAbstract
@@ -1108,12 +1096,10 @@ class Container implements ContainerContract {
         abstractOrCallback: ContainerAbstract | ContainerAfterResolvingFunction,
         callback: ContainerAfterResolvingFunction | null = null
     ): void {
-        if (typeof abstractOrCallback === 'string') {
-            abstractOrCallback = this.getAlias(abstractOrCallback);
-        }
         if (typeof abstractOrCallback === 'function' && callback === null) {
             this.globalAfterResolvingCallbacks.push(abstractOrCallback as ContainerAfterResolvingFunction);
         } else {
+            abstractOrCallback = this.getAlias(abstractOrCallback as ContainerAbstract);
             const callbacks =
                 (this.afterResolvingCallbacksMap.get(
                     abstractOrCallback as ContainerAbstract
@@ -1132,9 +1118,9 @@ class Container implements ContainerContract {
             if (
                 abstract === abs ||
                 (typeof abstract === 'function' && typeof abs === 'function' && abstract.prototype instanceof abs) ||
-                (typeof abs === 'string' &&
+                ((typeof abs === 'string' || typeof abs === 'symbol') &&
                     typeof abstract === 'function' &&
-                    ((Reflect.getMetadata('design:interfaces', abstract) ?? []) as string[]).includes(abs))
+                    ((Reflect.getMetadata('design:interfaces', abstract) ?? []) as (string | symbol)[]).includes(abs))
             ) {
                 this.fireBeforeCallbackArray(abstract, parameters, callbacks);
             }
@@ -1185,8 +1171,10 @@ class Container implements ContainerContract {
             if (
                 abstract === abs ||
                 (typeof abs === 'function' && obj instanceof abs) ||
-                (typeof abs === 'string' &&
-                    ((Reflect.getMetadata('design:interfaces', obj.constructor) ?? []) as string[]).includes(abs))
+                ((typeof abs === 'string' || typeof abs === 'symbol') &&
+                    ((Reflect.getMetadata('design:interfaces', obj.constructor) ?? []) as (string | symbol)[]).includes(
+                        abs
+                    ))
             ) {
                 results = results.concat(callbacks);
             }
@@ -1210,7 +1198,7 @@ class Container implements ContainerContract {
     /**
      * set a value with the container.
      */
-    public set<T>(abstract: string, value: any): void {
+    public set<T>(abstract: string | symbol, value: any): void {
         this.bind<T>(abstract, typeof value === 'function' ? value : () => value);
     }
 

@@ -54,6 +54,22 @@ const builtinObjects = [
     Intl.Locale
 ];
 
+const reservedSymbols = [
+    Symbol.asyncIterator,
+    Symbol.hasInstance,
+    Symbol.isConcatSpreadable,
+    Symbol.iterator,
+    Symbol.match,
+    Symbol.matchAll,
+    Symbol.replace,
+    Symbol.search,
+    Symbol.split,
+    Symbol.species,
+    Symbol.toPrimitive,
+    Symbol.toStringTag,
+    Symbol.unscopables
+];
+
 function beautifyString(str: string): string {
     return str
         .replace(/((\/\/.*$)|(\/\*[\s\S]*?\*\/))/gm, '')
@@ -154,15 +170,17 @@ export function arrayWrap<T = undefined>(value: T | T[]): T[] {
 
 /**
  * Get the class of the given parameter's type, if possible.
- *
- * @todo improve when ECMASCRIPTdecorator stage3
  */
 export function getParameterClass(parameter: ReflectionParameter): any {
     if (parameter.type == null || builtinObjects.includes(parameter.type)) {
         return null;
     }
 
-    if (typeof parameter.type !== 'function' && typeof parameter.type !== 'string') {
+    if (
+        typeof parameter.type !== 'function' &&
+        typeof parameter.type !== 'string' &&
+        typeof parameter.type !== 'symbol'
+    ) {
         throw new CircularDependencyError(
             `Unresolvable dependency resolving [[Parameter #${parameter.index} [ <required> ${parameter.name} ]] in class ${parameter.className} inside circular dependency.`
         );
@@ -183,15 +201,16 @@ export function unwrapIfClosure(value: any, ...args: any): any {
  */
 export function dontTrapProperty(property: string | symbol): boolean {
     return (
-        typeof property === 'symbol' ||
-        property.startsWith('#') ||
-        property === 'then' ||
-        property === 'catch' ||
-        property === 'finally' ||
-        property === 'arguments' ||
-        property === 'prototype' ||
-        property === 'constructor' ||
-        property === 'toJSON'
+        (typeof property === 'symbol' && reservedSymbols.includes(property)) ||
+        (typeof property === 'string' &&
+            (property.startsWith('#') ||
+                property === 'then' ||
+                property === 'catch' ||
+                property === 'finally' ||
+                property === 'arguments' ||
+                property === 'prototype' ||
+                property === 'constructor' ||
+                property === 'toJSON'))
     );
 }
 

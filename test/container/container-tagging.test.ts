@@ -1,6 +1,6 @@
 import { expect } from 'chai';
 import * as sinon from 'sinon';
-import Container, { constructable } from '../../src';
+import { constructable, Container } from '../../src';
 
 interface IContainerTaggedContractStub {
     //

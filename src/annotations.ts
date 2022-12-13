@@ -6,7 +6,7 @@ export function methodable() {
         propertyKey: string | symbol,
         descriptor: TypedPropertyDescriptor<T>
     ): TypedPropertyDescriptor<T> | undefined {
-        const types = Reflect.getMetadata('design:paramtypes', target, propertyKey) ?? [];
+        const types = Reflect.getMetadata('design:paramtypes', target, propertyKey);
         Reflect.defineMetadata('design:paramtypes', types, target, propertyKey);
         const definitions = getParametersDefinition((target as any)[propertyKey] as Function, target.constructor.name);
         Reflect.defineMetadata('design:paramdefinitions', definitions, target, propertyKey);
@@ -14,9 +14,9 @@ export function methodable() {
     };
 }
 
-export function constructable(...interfaces: string[]) {
+export function constructable(...interfaces: (string | Symbol)[]) {
     return function <TFunction extends Function>(target: TFunction): TFunction | undefined {
-        const types = Reflect.getMetadata('design:paramtypes', target) ?? [];
+        const types = Reflect.getMetadata('design:paramtypes', target);
         Reflect.defineMetadata('design:paramtypes', types, target);
         const definitions = getParametersDefinition(target, target.name, true);
         Reflect.defineMetadata('design:paramdefinitions', definitions, target);
@@ -27,7 +27,7 @@ export function constructable(...interfaces: string[]) {
 
 export function inject(value: any) {
     return function (target: Object, propertyKey: string | symbol, parameterIndex: number): void {
-        const types = Reflect.getMetadata('design:paramtypes', target, propertyKey) ?? [];
+        const types = Reflect.getMetadata('design:paramtypes', target, propertyKey);
         types[parameterIndex] = value;
         Reflect.defineMetadata('design:paramtypes', types, target, propertyKey);
     };

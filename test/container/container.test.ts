@@ -1,5 +1,5 @@
 import { expect } from 'chai';
-import Container, { constructable, inject } from '../../src/index';
+import { constructable, Container, inject } from '../../src/index';
 import CircularAStub from '../stubs/circular-a-stub';
 after(async () => {
     Container.setInstance(null);
@@ -21,7 +21,7 @@ class ContainerImplementationStub implements IContainerContractStub {
 
 @constructable()
 class ContainerDependentStub {
-    public constructor(@inject('IContainerContractStub') public impl: IContainerContractStub) {}
+    public constructor(@inject(Symbol.for('IContainerContractStub')) public impl: IContainerContractStub) {}
 }
 
 @constructable()
@@ -46,7 +46,7 @@ class ContainerInjectVariableStubWithInterfaceImplementation implements IContain
 
 @constructable()
 class Refreshable {
-    constructor(@inject('IContainerContractStub') public concrete: IContainerContractStub) {}
+    constructor(@inject(Symbol.for('IContainerContractStub')) public concrete: IContainerContractStub) {}
     public setConcrete(concrete: IContainerContractStub) {
         this.concrete = concrete;
         return this;
@@ -64,7 +64,9 @@ describe('Container', () => {
         Container.setInstance();
         const container2 = Container.getInstance();
         expect(container2).to.be.instanceOf(Container);
-        expect(container === container2).to.false;
+        expect(container === container2).to.be.false;
+        const container3 = Container.getInstance();
+        expect(container3 === container2).to.be.true;
     });
 
     it('Works Closure Resolution', () => {
@@ -87,6 +89,11 @@ describe('Container', () => {
         });
 
         expect(container.make('name')).to.eq('Claudio');
+
+        container.bind(ContainerConcreteStub, ContainerImplementationStub);
+        container.bindIf(ContainerConcreteStub);
+
+        expect(container.make(ContainerConcreteStub)).to.be.instanceOf(ContainerImplementationStub);
     });
 
     it('Works BindIf Does Register If Service Not Registered Yet', () => {
@@ -101,20 +108,28 @@ describe('Container', () => {
         });
 
         expect(container.make('name')).to.eq('Alberto');
+
+        container.bindIf(ContainerConcreteStub);
+        expect(container.make(ContainerConcreteStub)).to.be.instanceOf(ContainerConcreteStub);
     });
 
     it('Works SingletonIf Doesnt Register If Binding Already Registered', () => {
         const container = new Container();
 
-        container.bind('name', () => {
+        container.singleton('name', () => {
             return 'Claudio';
         });
 
-        container.bindIf('name', () => {
+        container.singletonIf('name', () => {
             return 'Alberto';
         });
 
         expect(container.make('name')).to.eq('Claudio');
+
+        container.singleton(ContainerConcreteStub, ContainerImplementationStub);
+        container.singletonIf(ContainerConcreteStub);
+
+        expect(container.make(ContainerConcreteStub)).to.be.instanceOf(ContainerImplementationStub);
     });
 
     it('Works SingletonIf Does Register If Binding Not Registered Yet', () => {
@@ -129,6 +144,9 @@ describe('Container', () => {
         const firstInstantiation = container.make('otherClass');
         const secondInstantiation = container.make('otherClass');
         expect(firstInstantiation === secondInstantiation).to.true;
+
+        container.singletonIf(ContainerConcreteStub);
+        expect(container.make(ContainerConcreteStub)).to.be.instanceOf(ContainerConcreteStub);
     });
 
     it('Works Shared Closure Resolution', () => {
@@ -148,6 +166,11 @@ describe('Container', () => {
         container.scoped('class', () => {
             return new (class {})();
         });
+
+        container.scoped('class', () => {
+            return new (class {})();
+        });
+
         const firstInstantiation = container.make('class');
         const secondInstantiation = container.make('class');
         expect(firstInstantiation === secondInstantiation).to.true;
@@ -167,6 +190,12 @@ describe('Container', () => {
 
         expect(container.make('class') === container.make('class')).to.true;
         expect(container.make('class')).to.not.eq('bar');
+
+        container.scopedIf(ContainerConcreteStub, ContainerImplementationStub);
+        container.scopedIf(ContainerConcreteStub);
+
+        expect(container.make(ContainerConcreteStub) === container.make(ContainerConcreteStub)).to.be.true;
+        expect(container.make(ContainerConcreteStub)).to.be.instanceOf(ContainerImplementationStub);
     });
 
     it('Works Scoped Closure Resets', () => {
@@ -217,20 +246,20 @@ describe('Container', () => {
         }).throw('concrete should be a closure or a class, "object" given');
 
         expect(() => {
-            container.bind('IContainerContractStub');
-        }).throw('please provide a concrete for abstract IContainerContractStub');
+            container.bind(Symbol.for('IContainerContractStub'));
+        }).throw('please provide a concrete for abstract Symbol(IContainerContractStub)');
     });
 
     it('Works Abstract To Concrete Resolution', () => {
         const container = new Container();
-        container.bind('IContainerContractStub', ContainerImplementationStub);
+        container.bind(Symbol.for('IContainerContractStub'), ContainerImplementationStub);
         const obj = container.make(ContainerDependentStub);
         expect(obj.impl).to.be.instanceOf(ContainerImplementationStub);
     });
 
     it('Works Nested Dependency Resolution', () => {
         const container = new Container();
-        container.bind('IContainerContractStub', ContainerImplementationStub);
+        container.bind(Symbol.for('IContainerContractStub'), ContainerImplementationStub);
         const obj = container.make(ContainerNestedDependentStub);
         expect(obj.inner).to.be.instanceOf(ContainerDependentStub);
         expect(obj.inner.impl).to.be.instanceOf(ContainerImplementationStub);
@@ -247,15 +276,16 @@ describe('Container', () => {
     });
 
     it('Works Proxy Handlers', () => {
-        let container = new Container() as Container & { [key: string]: any };
-        expect('something' in container).to.be.false;
-        container.something = () => {
+        let container = new Container() as Container & { [key: string | symbol]: any };
+        expect(Symbol.for('something') in container).to.be.false;
+        container[Symbol.for('something')] = () => {
             return 'foo';
         };
-        expect('something' in container).to.be.true;
-        expect(container.something).to.not.undefined;
-        delete container.something;
-        expect('something' in container).to.be.false;
+        expect(Symbol.for('something') in container).to.be.true;
+        expect(container.get(Symbol.for('something'))).to.eq('foo');
+        expect(container[Symbol.for('something')]).to.not.undefined;
+        delete container[Symbol.for('something')];
+        expect(Symbol.for('something') in container).to.be.false;
 
         //test proxy set when it's not a closure
         container = new Container() as Container & { [key: string]: any };
@@ -394,11 +424,11 @@ describe('Container', () => {
             return undefined;
         });
         expect(container.bound(ContainerConcreteStub)).to.be.true;
-        expect(container.bound('IContainerContractStub')).to.be.false;
+        expect(container.bound(Symbol.for('IContainerContractStub'))).to.be.false;
 
         container = new Container();
-        container.bind('IContainerContractStub', ContainerConcreteStub);
-        expect(container.bound('IContainerContractStub')).to.be.true;
+        container.bind(Symbol.for('IContainerContractStub'), ContainerConcreteStub);
+        expect(container.bound(Symbol.for('IContainerContractStub'))).to.be.true;
         expect(container.bound(ContainerConcreteStub)).to.be.false;
     });
 
@@ -473,15 +503,17 @@ describe('Container', () => {
     it('Throw Binding Resolution Error Message', () => {
         const container = new Container();
         expect(() => {
-            container.make('IContainerContractStub');
-        }).to.throw('Target [IContainerContractStub] is not instantiable.');
+            container.make(Symbol.for('IContainerContractStub'));
+        }).to.throw('Target [Symbol(IContainerContractStub)] is not instantiable.');
     });
 
     it('Throw Binding Resolution Error Message Includes Build Stack', () => {
         const container = new Container();
         expect(() => {
             container.make(ContainerDependentStub);
-        }).to.throw('Target [IContainerContractStub] is not instantiable while building [ContainerDependentStub].');
+        }).to.throw(
+            'Target [Symbol(IContainerContractStub)] is not instantiable while building [ContainerDependentStub].'
+        );
     });
 
     it('ForgetInstance Forgets Instance', () => {
@@ -627,9 +659,9 @@ describe('Container', () => {
 
     it('Works Resolving With Using An Interface', () => {
         const container = new Container();
-        container.bind('IContainerContractStub', ContainerInjectVariableStubWithInterfaceImplementation);
+        container.bind(Symbol.for('IContainerContractStub'), ContainerInjectVariableStubWithInterfaceImplementation);
         const instance = container.make<ContainerInjectVariableStubWithInterfaceImplementation>(
-            'IContainerContractStub',
+            Symbol.for('IContainerContractStub'),
             { something: 'tada' }
         );
         expect(instance.something).to.eq('tada');
@@ -673,14 +705,14 @@ describe('Container', () => {
 
     it('Can Build Without Parameter Stack With Constructors', () => {
         const container = new Container();
-        container.bind('IContainerContractStub', ContainerImplementationStub);
+        container.bind(Symbol.for('IContainerContractStub'), ContainerImplementationStub);
         expect(container.build(ContainerDependentStub)).to.be.instanceOf(ContainerDependentStub);
     });
 
     it('Knows Entry', () => {
         const container = new Container();
-        container.bind('IContainerContractStub', ContainerImplementationStub);
-        expect(container.has('IContainerContractStub')).to.be.true;
+        container.bind(Symbol.for('IContainerContractStub'), ContainerImplementationStub);
+        expect(container.has(Symbol.for('IContainerContractStub'))).to.be.true;
     });
 
     it('Can Bind Any Word', () => {
@@ -735,12 +767,12 @@ describe('Container', () => {
 
     it('Works Refresh', () => {
         const container = new Container();
-        container.bind('IContainerContractStub', ContainerImplementationStubTwo);
+        container.bind(Symbol.for('IContainerContractStub'), ContainerImplementationStubTwo);
         const instance = container.make(Refreshable);
-        container.refresh('IContainerContractStub', instance, 'setConcrete');
+        container.refresh(Symbol.for('IContainerContractStub'), instance, 'setConcrete');
         expect(instance.concrete).to.be.instanceOf(ContainerImplementationStubTwo);
 
-        container.bind('IContainerContractStub', ContainerImplementationStub);
+        container.bind(Symbol.for('IContainerContractStub'), ContainerImplementationStub);
         expect(instance.concrete).to.be.instanceOf(ContainerImplementationStub);
     });
 

@@ -125,7 +125,6 @@ describe('Util', () => {
     });
 
     it('Works Dont Trap Property', () => {
-        expect(dontTrapProperty(Symbol.for('ciao'))).to.be.true;
         expect(dontTrapProperty('then')).to.be.true;
         expect(dontTrapProperty('catch')).to.be.true;
         expect(dontTrapProperty('finally')).to.be.true;
@@ -134,6 +133,21 @@ describe('Util', () => {
         expect(dontTrapProperty('constructor')).to.be.true;
         expect(dontTrapProperty('toJSON')).to.be.true;
         expect(dontTrapProperty('#private')).to.be.true;
+        expect(dontTrapProperty(Symbol.asyncIterator)).to.be.true;
+        expect(dontTrapProperty(Symbol.hasInstance)).to.be.true;
+        expect(dontTrapProperty(Symbol.isConcatSpreadable)).to.be.true;
+        expect(dontTrapProperty(Symbol.iterator)).to.be.true;
+        expect(dontTrapProperty(Symbol.match)).to.be.true;
+        expect(dontTrapProperty(Symbol.matchAll)).to.be.true;
+        expect(dontTrapProperty(Symbol.replace)).to.be.true;
+        expect(dontTrapProperty(Symbol.search)).to.be.true;
+        expect(dontTrapProperty(Symbol.split)).to.be.true;
+        expect(dontTrapProperty(Symbol.species)).to.be.true;
+        expect(dontTrapProperty(Symbol.toPrimitive)).to.be.true;
+        expect(dontTrapProperty(Symbol.toStringTag)).to.be.true;
+        expect(dontTrapProperty(Symbol.unscopables)).to.be.true;
+
+        expect(dontTrapProperty(Symbol.for('regularSymbol'))).to.be.false;
         expect(dontTrapProperty('regularProperty')).to.be.false;
     });
 
