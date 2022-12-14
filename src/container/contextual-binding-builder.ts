@@ -1,6 +1,5 @@
 import LogicError from '../errors/logic-error';
 import {
-    Config,
     Container,
     ContainerNewable,
     ContextualAbstract,
@@ -31,10 +30,6 @@ class ContextualBindingBuilder implements ContextualBindingBuilderContract {
         this.give(function (container: Container) {
             return container.tagged(tag);
         });
-    }
-
-    public giveConfig(key: string, defaultValue?: any): void {
-        this.give((container: Container) => container.get<Config>('config').get(key, defaultValue));
     }
 
     protected validateNeed(): void {

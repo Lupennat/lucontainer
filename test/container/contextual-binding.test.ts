@@ -1,16 +1,8 @@
 import { expect } from 'chai';
 import { constructable, Container, inject } from '../../src/index';
-import { Config } from '../../src/types';
 
 interface IContainerContextContractStub {
     //
-}
-
-class Repository implements Config {
-    constructor(public values: { [key: string]: any } = {}) {}
-    get<T>(key: string, defaultValue?: T): T | undefined {
-        return key in this.values ? this.values[key] : defaultValue;
-    }
 }
 
 @constructable()
@@ -438,89 +430,6 @@ describe('Contextual Binding', () => {
         expect(resolvedInstance.stubs.length).to.eq(2);
         expect(resolvedInstance.stubs[0]).to.be.instanceOf(ContainerContextImplementationStub);
         expect(resolvedInstance.stubs[1]).to.be.instanceOf(ContainerContextImplementationStubTwo);
-    });
-
-    it('Gives Values From Config Optional Value Null', () => {
-        const container = new Container();
-
-        container.singleton('config', () => {
-            return new Repository({
-                username: 'claudio',
-                password: 'mustbe84'
-            });
-        });
-
-        container.when(ContainerTestContextInjectFromConfigIndividualValues).needs('username').giveConfig('username');
-        container.when(ContainerTestContextInjectFromConfigIndividualValues).needs('password').giveConfig('password');
-
-        const resolvedInstance = container.make(ContainerTestContextInjectFromConfigIndividualValues);
-        expect(resolvedInstance.username).to.eq('claudio');
-        expect(resolvedInstance.password).to.eq('mustbe84');
-        expect(resolvedInstance.alias).to.null;
-    });
-
-    it('Gives Values From Config Optional Value Set', () => {
-        const container = new Container();
-
-        container.singleton('config', () => {
-            return new Repository({
-                username: 'claudio',
-                password: 'mustbe84',
-                alias: 'lupennat'
-            });
-        });
-
-        container.when(ContainerTestContextInjectFromConfigIndividualValues).needs('username').giveConfig('username');
-        container.when(ContainerTestContextInjectFromConfigIndividualValues).needs('password').giveConfig('password');
-        container.when(ContainerTestContextInjectFromConfigIndividualValues).needs('alias').giveConfig('alias');
-
-        const resolvedInstance = container.make(ContainerTestContextInjectFromConfigIndividualValues);
-        expect(resolvedInstance.username).to.eq('claudio');
-        expect(resolvedInstance.password).to.eq('mustbe84');
-        expect(resolvedInstance.alias).to.eq('lupennat');
-    });
-
-    it('Gives Values From Config With Default', () => {
-        const container = new Container();
-
-        container.singleton('config', () => {
-            return new Repository({
-                password: 'mustbe84'
-            });
-        });
-
-        container
-            .when(ContainerTestContextInjectFromConfigIndividualValues)
-            .needs('username')
-            .giveConfig('username', 'DEFAULT_USERNAME');
-
-        container.when(ContainerTestContextInjectFromConfigIndividualValues).needs('password').giveConfig('password');
-
-        const resolvedInstance = container.make(ContainerTestContextInjectFromConfigIndividualValues);
-        expect(resolvedInstance.username).to.eq('DEFAULT_USERNAME');
-        expect(resolvedInstance.password).to.eq('mustbe84');
-        expect(resolvedInstance.alias).to.null;
-    });
-
-    it('Gives Values From Config Object', () => {
-        const container = new Container();
-
-        container.singleton('config', () => {
-            return new Repository({
-                settings: {
-                    username: 'claudio',
-                    password: 'mustbe84',
-                    alias: 'lupennat'
-                }
-            });
-        });
-
-        container.when(ContainerTestContextInjectFromConfigObject).needs('settings').giveConfig('settings');
-
-        const resolvedInstance = container.make(ContainerTestContextInjectFromConfigObject);
-        expect(resolvedInstance.settings.username).to.eq('claudio');
-        expect(resolvedInstance.settings.password).to.eq('mustbe84');
-        expect(resolvedInstance.settings.alias).to.eq('lupennat');
     });
 
     it('Throw Logic Error When Give Is Called Without Need', () => {

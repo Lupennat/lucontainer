@@ -232,14 +232,6 @@ import ReportAggregator from './service/report-aggregator';
 container.when(ReportAggregator).needs('reports').giveTagged('reports');
 ```
 
-If you need to inject a value from one of your application's configuration files, you may use the `giveConfig` method:
-
-```ts
-import ReportAggregator from './service/report-aggregator';
-
-container.when(ReportAggregator).needs('timezone').giveConfig('app.timezone');
-```
-
 ## Binding Typed Variadics
 
 Occasionally, you may have a class that receives an array of typed objects using a variadic constructor argument:

@@ -775,16 +775,4 @@ describe('Container', () => {
         container.bind(Symbol.for('IContainerContractStub'), ContainerImplementationStub);
         expect(instance.concrete).to.be.instanceOf(ContainerImplementationStub);
     });
-
-    it('Works Set', () => {
-        const container = new Container();
-        container.set('foo', [1, 2, 3]);
-        expect(container.make('foo')).to.eql([1, 2, 3]);
-        container.set('foo', ContainerImplementationStub);
-        expect(container.make('foo')).to.be.instanceOf(ContainerImplementationStub);
-        container.set('foo', () => {
-            return 'foo';
-        });
-        expect(container.make('foo')).to.eq('foo');
-    });
 });

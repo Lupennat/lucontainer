@@ -132,7 +132,13 @@ class Container implements ContainerContract {
      */
     public when(concrete: ContainerNewable | ContainerNewable[]): ContextualBindingBuilderContract {
         const aliases = arrayWrap<ContainerNewable>(concrete);
+        return this.newContextualBinding(aliases);
+    }
 
+    /**
+     * Generate new ContextualBinding
+     */
+    protected newContextualBinding(aliases: ContainerNewable[]): ContextualBindingBuilderContract {
         return new ContextualBindingBuilder(this, aliases);
     }
 
@@ -1189,13 +1195,6 @@ class Container implements ContainerContract {
         for (const fnToCall of callbacks) {
             fnToCall(object, this);
         }
-    }
-
-    /**
-     * set a value with the container.
-     */
-    public set<T>(abstract: string | symbol, value: any): void {
-        this.bind<T>(abstract, typeof value === 'function' ? value : () => value);
     }
 
     /**
