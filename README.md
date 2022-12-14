@@ -42,6 +42,7 @@ Lucontainer requires a modern JavaScript engine with support for:
 
 -   [Reflect metadata](https://rbuckton.github.io/reflect-metadata)
 -   [Map](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Map)
+-   [Set](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Set)
 -   [Proxy](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Proxy)
 
 > **Warning**
@@ -129,7 +130,7 @@ container.singleton(Transistor, function (app) {
 
 ### Binding Scoped Singletons
 
-The `scoped` method binds a class or a name (you can't bind Typescript Interfaces) into the container that should only be resolved one time within a given request / job lifecycle. While this method is similar to the singleton method, instances registered using the scoped method should be dafely flushed whenever the application starts a new "lifecycle", such as your application receive a `new request` or a worker processes a `new job`:
+The `scoped` method binds a class or a name (you can't bind Typescript Interfaces) into the container that should only be resolved one time within a given request / job lifecycle. While this method is similar to the singleton method, instances registered using the scoped method should be safely flushed whenever the application starts a new "lifecycle", such as your application receive a `new request` or a worker processes a `new job`:
 
 ```ts
 import Transistor from './services/transistor';
@@ -157,7 +158,8 @@ container.instance(Transistor, function (app) {
 
 > **Note**
 > Interfaces Workaround
-> A very powerful feature of the service container is its ability to bind a name (you can't bind Typescript Interfaces) to a given implementation. For example, let's assume we have an `EventPusher` interface and a `RedisEventPusher` implementation. Once we have coded our `RedisEventPusher` implementation of this interface, we can register it with the service container like so:
+
+A very powerful feature of the service container is its ability to bind a name (you can't bind Typescript Interfaces) to a given implementation. For example, let's assume we have an `EventPusher` interface and a `RedisEventPusher` implementation. Once we have coded our `RedisEventPusher` implementation of this interface, we can register it with the service container like so:
 
 ```ts
 import { constructable } from './src';
