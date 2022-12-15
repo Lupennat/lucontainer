@@ -4,7 +4,8 @@ if (typeof Reflect === 'undefined' || !Reflect.getMetadata) {
     );
 }
 
-export * from './container';
+export { default as Container } from './container';
+export { default as ContextualBindingBuilder } from './contextual-binding-builder';
 export * from './decorators';
 export * from './errors';
-export { Container, ContextualBindingBuilder } from './types';
+export { ContainerI, ContextualBindingBuilderI } from './types';

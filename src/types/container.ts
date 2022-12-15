@@ -1,16 +1,16 @@
 import ContextualBindingBuilder, { ContextualAbstract, ContextualImplementation } from './contextual-binding-builder';
 
-interface CallbackWithContainerInstance {
+export interface CallbackWithContainerInstance {
     instance: any;
-    container: Container;
+    container: ContainerI;
 }
 
-interface CallbackWithContainerInstanceParameters extends CallbackWithContainerInstance {
+export interface CallbackWithContainerInstanceParameters extends CallbackWithContainerInstance {
     parameters: ContainerParameters;
 }
 
-interface CallbackWithContainerParameters {
-    container: Container;
+export interface CallbackWithContainerParameters {
+    container: ContainerI;
     parameters: ContainerParameters;
 }
 
@@ -54,7 +54,7 @@ export interface ContainerBinding {
     shared: boolean;
 }
 
-export default interface Container {
+export default interface ContainerI {
     /**
      * Define a contextual binding.
      */

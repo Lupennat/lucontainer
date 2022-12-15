@@ -21,6 +21,8 @@ typescript/
 .prettierrc.yml
 .huskyrc.json
 .nvmrc
+.publishrc
+.prettierrc
 
 # Lock files
 package-lock.json

@@ -3,7 +3,7 @@ import { ContainerConcreteFunction, ContainerNewable } from './container';
 export type ContextualAbstract<T = unknown> = string | symbol | ContainerNewable<T>;
 export type ContextualImplementation = ContainerConcreteFunction | any;
 
-export default interface ContextualBindingBuilder {
+export default interface ContextualBindingBuilderI {
     /**
      * Define the abstract target that depends on the context.
      */

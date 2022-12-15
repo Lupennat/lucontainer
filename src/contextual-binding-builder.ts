@@ -1,6 +1,5 @@
 import LogicError from './errors/logic-error';
-import { Container } from './types';
-import { ContainerNewable } from './types/container';
+import ContainerI, { ContainerNewable } from './types/container';
 import {
     ContextualAbstract,
     ContextualImplementation,
@@ -12,7 +11,7 @@ import { arrayWrap } from './utils';
 class ContextualBindingBuilder implements ContextualBindingBuilderI {
     protected need: ContextualAbstract | null = null;
 
-    constructor(protected container: Container, protected concrete: ContainerNewable[]) {}
+    constructor(protected container: ContainerI, protected concrete: ContainerNewable[]) {}
 
     public needs(abstract: ContextualAbstract): this {
         this.need = abstract;
@@ -28,7 +27,7 @@ class ContextualBindingBuilder implements ContextualBindingBuilderI {
     }
 
     public giveTagged(tag: string): void {
-        this.give(function ({ container }: { container: Container }) {
+        this.give(function ({ container }: { container: ContainerI }) {
             return container.tagged(tag);
         });
     }

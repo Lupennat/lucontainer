@@ -1,8 +1,15 @@
 {
     "extends": "./typescript/tsconfig.base.json",
     "compilerOptions": {
-        "target": "es2015",
+        "lib": ["es2020"],
         "module": "commonjs",
-        "outDir": "./dist/cjs"
+        "target": "es2020",
+        "outDir": "./dist/cjs",
+
+        "strict": true,
+        "esModuleInterop": true,
+        "skipLibCheck": true,
+        "forceConsistentCasingInFileNames": true,
+        "moduleResolution": "node"
     }
 }
