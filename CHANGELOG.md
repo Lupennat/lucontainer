@@ -16,6 +16,10 @@ Code Refactoring
 - Added all public methods to `Container` interface
 - Added CHANGELOG
 
+### Changed
+- Changed interface `ContextualBindingBuilder` to `ContextualBindingBuilderI`
+- Changed interface `Container` to `ContainerI`
+
 ### Fixed
 - Fixed Documentation
 - Fixed Tests
