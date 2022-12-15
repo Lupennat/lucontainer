@@ -105,8 +105,8 @@ We can register a binding using the `bind` method, passing the class or a name (
 import Transistor from './services/transistor';
 import PodcastParser from './services/podcast-parser';
 
-container.bind(Transistor, function (app) {
-    return new Transistor(app.make(PodcastParser));
+container.bind(Transistor, function ({container}) {
+    return new Transistor(container.make(PodcastParser));
 });
 ```
 
@@ -123,8 +123,8 @@ The `singleton` method binds a class or a name (you can't bind Typescript Interf
 import Transistor from './services/transistor';
 import PodcastParser from './services/podcast-parser';
 
-container.singleton(Transistor, function (app) {
-    return new Transistor(app.make(PodcastParser));
+container.singleton(Transistor, function ({container}) {
+    return new Transistor(container.make(PodcastParser));
 });
 ```
 
@@ -136,8 +136,8 @@ The `scoped` method binds a class or a name (you can't bind Typescript Interface
 import Transistor from './services/transistor';
 import PodcastParser from './services/podcast-parser';
 
-container.scoped(Transistor, function (app) {
-    return new Transistor(app.make(PodcastParser));
+container.scoped(Transistor, function ({container}) {
+    return new Transistor(container.make(PodcastParser));
 });
 ```
 
@@ -149,8 +149,8 @@ You may also bind an existing object instance into the container using the `inst
 import Transistor from './services/transistor';
 import PodcastParser from './services/podcast-parser';
 
-container.instance(Transistor, function (app) {
-    return new Transistor(app.make(PodcastParser));
+container.instance(Transistor, function ({container}) {
+    return new Transistor(container.make(PodcastParser));
 });
 ```
 
@@ -254,8 +254,8 @@ Using contextual binding, you may resolve this dependency by providing the `give
 container
     .when(Firewall)
     .needs(Filter)
-    .give(function (app) {
-        return [app.make(NullFilter), app.make(ProfanityFilter), app.make(TooLongFilter)];
+    .give(function ({container}) {
+        return [container.make(NullFilter), container.make(ProfanityFilter), container.make(TooLongFilter)];
     });
 ```
 
@@ -293,8 +293,8 @@ Once the services have been tagged, you may easily resolve them all via the cont
 
 ```ts
 import ReportAnalyzer from './services/report-analyzer';
-container.bind(ReportAnalyzer, function (app) {
-    return new ReportAnalyzer(app.tagged('reports'));
+container.bind(ReportAnalyzer, function ({container}) {
+    return new ReportAnalyzer(container.tagged('reports'));
 });
 ```
 
@@ -303,8 +303,8 @@ container.bind(ReportAnalyzer, function (app) {
 The `extend` method allows the modification of resolved services. For example, when a service is resolved, you may run additional code to decorate or configure the service. The `extend` method accepts two arguments, the service class you're extending and a closure that should return the modified service. The closure receives the service being resolved and the container instance:
 
 ```ts
-container.extend(Service, function (service: Service, app: Container) {
-    return new DecoratedService(service);
+container.extend(Service, function ({instance}) {
+    return new DecoratedService(instance);
 });
 ```
 
@@ -390,28 +390,28 @@ import Transistor from './services/transistor';
 
 container.beforeResolving(
     Transistor,
-    function (transistor: Transistor, parameters: ContainerParameters, app: container) {
+    function ({instance, parameters, container}) {
         // Called before container resolves objects of type "Transistor"...
     }
 );
 
-container.resolving(Transistor, function (transistor: Transistor, app: container) {
+container.resolving(Transistor, function ({instance, container}) {
     // Called when container resolves objects of type "Transistor"...
 });
 
-container.afterResolving(Transistor, function (transistor: Transistor, app: container) {
+container.afterResolving(Transistor, function ({instance, container}) {
     // Called after container resolves objects of type "Transistor"...
 });
 
-container.beforeResolving(function (transistor: Transistor, parameters: ContainerParameters, app: container) {
+container.beforeResolving(function ({instance, parameters, container}) {
     // Called before container resolves object of any type...
 });
 
-container.resolving(function (transistor: Transistor, app: container) {
+container.resolving(function ({instance, container}) {
     // Called when container resolves object of any type...
 });
 
-container.afterResolving(function (transistor: Transistor, app: container) {
+container.afterResolving(function ({instance, container}) {
     // Called after container resolves object of any type...
 });
 ```

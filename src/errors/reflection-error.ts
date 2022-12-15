@@ -1,3 +1,3 @@
 class ReflectionError extends Error {}
 
-export = ReflectionError;
+export default ReflectionError;
