@@ -1,3 +1,3 @@
 class BindingResolutionError extends Error {}
 
-export = BindingResolutionError;
+export default BindingResolutionError;
