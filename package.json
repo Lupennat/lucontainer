@@ -29,6 +29,8 @@
         "access": "public"
     },
     "scripts": {
+        "prepublishOnly": "safe-publish-latest && npm run test && npm run build",
+        "prepublish": "not-in-publish || npm run prepublishOnly",
         "build": "npm run clean && npm run build:cjs && npm run build:es5 && npm run build:es2015 && npm run build:types",
         "build:cjs": "tsc",
         "build:es5": "tsc -p ./typescript/tsconfig.esm5.json",
@@ -62,6 +64,7 @@
     },
     "dependencies": {
         "acorn": "^8.8.1",
+        "safe-publish-latest": "^2.0.0",
         "tslib": "^2.4.1"
     }
 }
