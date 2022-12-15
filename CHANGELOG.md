@@ -19,6 +19,14 @@ Code Refactoring
 ### Changed
 - Changed interface `ContextualBindingBuilder` to `ContextualBindingBuilderI`
 - Changed interface `Container` to `ContainerI`
+- Changed `ContainerConcreteFunction`, now is called with a single parameter of type `CallbackWithContainerParameters`
+- Changed `ContainerExtendFunction`, now is called with a single parameter of type `CallbackWithContainerInstance`
+- Changed `ContainerMethodBindingFunction`, now is called with a single parameter of type `CallbackWithContainerInstance`
+- Changed `ContainerBeforeResolvingFunction`, now is called with a single parameter of type `CallbackWithContainerInstanceParameters`
+- Changed `ContainerResolvingFunction`, now is called with a single parameter of type `CallbackWithContainerInstance`
+- Changed `ContainerAfterResolvingFunction`, now is called with a single parameter of type `CallbackWithContainerInstance`
+- Changed `ContainerReboundFunction`, now is called with a single parameter of type `CallbackWithContainerInstance`
+
 
 ### Fixed
 - Fixed Documentation
