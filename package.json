@@ -35,7 +35,7 @@
         "access": "public"
     },
     "scripts": {
-        "prepublishOnly": "safe-publish-latest && npm run test && npm run build",
+        "prepublishOnly": "safe-publish-latest && npm run build",
         "prepublish": "not-in-publish || npm run prepublishOnly",
         "build": "npm run clean && npm run build:cjs && npm run build:es5 && npm run build:types",
         "build:cjs": "tsc",
@@ -59,7 +59,6 @@
         "eslint": "^8.29.0",
         "eslint-config-prettier": "^8.5.0",
         "eslint-plugin-prettier": "^4.2.1",
-        "husky": "^8.0.2",
         "jest": "^29.3.1",
         "prettier": "^2.8.1",
         "reflect-metadata": "^0.1.13",
