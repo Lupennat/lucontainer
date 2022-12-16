@@ -21,11 +21,6 @@ jobs:
         env:
           CI: true
 
-      - name: Build
-        run: npm run build
-        env:
-          CI: true
-
       - name: Set NPM Token Action
         uses: filipstefansson/set-npm-token-action@v1.1
         with:
@@ -34,4 +29,5 @@ jobs:
       - name: Publish new version
         run: npm publish
         env:
+          CI: true
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
