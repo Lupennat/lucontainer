@@ -1,6 +1,6 @@
 {
     "name": "lucontainer",
-    "version": "2.0.0",
+    "version": "1.0.0",
     "description": "Service Container for Node js",
     "author": "Claudio Pennati <claudio.pennati@gmail.com>",
     "license": "MIT",
@@ -64,12 +64,12 @@
         "prettier": "^2.8.1",
         "reflect-metadata": "^0.1.13",
         "rimraf": "^3.0.2",
+        "safe-publish-latest": "^2.0.0",
         "ts-jest": "^29.0.3",
         "typescript": "^4.9.4"
     },
     "dependencies": {
         "acorn": "^8.8.1",
-        "safe-publish-latest": "^2.0.0",
         "tslib": "^2.4.1"
     }
 }
