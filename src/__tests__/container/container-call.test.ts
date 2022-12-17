@@ -361,7 +361,7 @@ describe('Container Call', () => {
         const container = new Container();
         const fnToCall = function (foo: string, bar = 'default') {};
 
-        annotate(fnToCall, [], []);
+        annotate(fnToCall, [], [String]);
 
         expect(() => {
             container.call(fnToCall);

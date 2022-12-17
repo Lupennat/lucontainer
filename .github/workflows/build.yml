@@ -1,6 +1,9 @@
 name: Build and Test
 
 on:
+  push:
+    branches:
+      - main
   pull_request:
     branches:
       - main
@@ -43,4 +46,5 @@ jobs:
           thresholds: '75 90'
 
       - name: Upload coverage to Codecov
+        if:  ${{ github.event_name == 'push' }}
         uses: codecov/codecov-action@v3
