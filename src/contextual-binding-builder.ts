@@ -2,8 +2,8 @@ import LogicError from './errors/logic-error';
 import ContainerI, { ContainerNewable } from './types/container';
 import {
     ContextualAbstract,
-    ContextualImplementation,
-    default as ContextualBindingBuilderI
+    default as ContextualBindingBuilderI,
+    ContextualImplementation
 } from './types/contextual-binding-builder';
 
 import { arrayWrap } from './utils';

@@ -36,11 +36,15 @@ jobs:
         uses: irongut/CodeCoverageSummary@v1.3.0
         with:
           filename: coverage/cobertura-coverage.xml
-          badge: true
+          badge: false
           fail_below_min: true
           format: markdown
           hide_branch_rate: false
           hide_complexity: true
           indicators: true
-          output: both
+          output: console
           thresholds: '75 90'
+
+      - name: Upload coverage to Codecov
+        if:  ${{ github.event_name == 'push' }}
+        uses: codecov/codecov-action@v3

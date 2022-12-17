@@ -16,6 +16,7 @@ import {
     ContainerConcreteFunction,
     ContainerExtendFunction,
     ContainerFactory,
+    default as ContainerI,
     ContainerKeyValParameters,
     ContainerMethodBindingFunction,
     ContainerNewable,
@@ -23,13 +24,12 @@ import {
     ContainerReboundFunction,
     ContainerResolvingFunction,
     ContainerTag,
-    ContainerWrappedFunction,
-    default as ContainerI
+    ContainerWrappedFunction
 } from './types/container';
 import {
     ContextualAbstract,
-    ContextualImplementation,
-    default as ContextualBindingBuilderI
+    default as ContextualBindingBuilderI,
+    ContextualImplementation
 } from './types/contextual-binding-builder';
 import { arrayWrap, dontTrapProperty, getParameterClass, isFunctionConstructor, unwrapIfClosure } from './utils';
 
@@ -615,7 +615,8 @@ class Container implements ContainerI {
                 fnToCall[1]
             ).map((definition: ReflectionParameter, index: number) => {
                 const type = types[index];
-                definition.type = type === Object && definition.type !== undefined ? definition.type : type;
+                definition.type =
+                    (type === Object || type === undefined) && definition.type !== undefined ? definition.type : type;
                 return definition;
             });
         } else {
@@ -628,7 +629,7 @@ class Container implements ContainerI {
             dependencies = Reflect.getMetadata('design:paramdefinitions', fnToCall).map(
                 (definition: ReflectionParameter, index: number) => {
                     const type = types[index];
-                    definition.type = type === Object && definition.type !== undefined ? definition.type : type;
+                    definition.type = definition.type !== undefined && type === undefined ? definition.type : type;
                     return definition;
                 }
             );
@@ -863,7 +864,8 @@ class Container implements ContainerI {
         const dependencies: any[] = Reflect.getMetadata('design:paramdefinitions', concrete).map(
             (definition: ReflectionParameter, index: number) => {
                 const type = types[index];
-                definition.type = type === Object && definition.type !== undefined ? definition.type : type;
+                definition.type =
+                    (type === Object || type === undefined) && definition.type !== undefined ? definition.type : type;
                 return definition;
             }
         );
