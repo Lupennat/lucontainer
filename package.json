@@ -1,6 +1,6 @@
 {
     "name": "lucontainer",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "description": "Service Container for Node js",
     "author": "Claudio Pennati <claudio.pennati@gmail.com>",
     "license": "MIT",
