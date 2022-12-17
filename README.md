@@ -1,7 +1,9 @@
 <p align="center">
 	<a href="https://www.npmjs.com/package/lucontainer" target="__blank"><img src="https://img.shields.io/npm/v/lucontainer?color=0476bc&label=" alt="NPM version"></a>
 	<a href="https://www.npmjs.com/package/lucontainer" target="__blank"><img alt="NPM Downloads" src="https://img.shields.io/npm/dm/lucontainer?color=3890aa&label="></a>
-	<!-- <a href="https://codecov.io/gh/inversify/InversifyJS" target="__blank"><img alt="Codecov" src="https://codecov.io/gh/Lupennat/lucontainer/branch/master/graph/badge.svg?token=AAAAAAA"></a> -->
+	<a href="https://codecov.io/gh/Lupennat/lucontainer" >
+        <img src="https://codecov.io/gh/Lupennat/lucontainer/branch/main/graph/badge.svg?token=l1fm5ZWd8O"/>
+    </a>
 </p>
 
 # lucontainer

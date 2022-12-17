@@ -46,5 +46,5 @@ jobs:
           thresholds: '75 90'
 
       - name: Upload coverage to Codecov
-        if:  ${{ github.event_name == 'push' }}
+        if:  ${{ github.event_name == 'push' && matrix.node-version == '18.x'}}
         uses: codecov/codecov-action@v3
