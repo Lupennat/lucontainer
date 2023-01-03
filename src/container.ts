@@ -31,7 +31,7 @@ import {
     default as ContextualBindingBuilderI,
     ContextualImplementation
 } from './types/contextual-binding-builder';
-import { arrayWrap, dontTrapProperty, getParameterClass, isFunctionConstructor, unwrapIfClosure } from './utils';
+import { arrayWrap, getParameterClass, isFunctionConstructor, unwrapIfClosure } from './utils';
 
 type AfterResolvingMap = Map<ContainerAbstract, ContainerAfterResolvingFunction[]>;
 type ResolvingMap = Map<ContainerAbstract, ContainerResolvingFunction[]>;
@@ -66,70 +66,6 @@ class Container implements ContainerI {
     protected contextualMap: Map<ContainerNewable, Map<ContextualAbstract, ContextualImplementation>> = new Map();
     protected buildStack: ContainerNewable[] = [];
     protected methodBindingsMap: Map<ContainerNewable, BindingMethods> = new Map();
-
-    constructor() {
-        let magicHasIsEnabled = true;
-        return new Proxy(this, {
-            get(target, p, receiver) {
-                magicHasIsEnabled = false;
-                const exists = Reflect.has(target, p);
-                magicHasIsEnabled = true;
-
-                if (exists || dontTrapProperty(p)) {
-                    return Reflect.get(target, p, receiver);
-                }
-
-                return target.make.call(receiver, p as string);
-            },
-            has(target, p): boolean {
-                if (!magicHasIsEnabled || dontTrapProperty(p)) {
-                    return Reflect.has(target, p);
-                }
-
-                if (Reflect.has(target, p)) {
-                    return true;
-                } else {
-                    return target.bound(p as string);
-                }
-            },
-            set(target, p, newValue, receiver): boolean {
-                magicHasIsEnabled = false;
-                const exists = Reflect.has(target, p);
-                magicHasIsEnabled = true;
-
-                if (exists || dontTrapProperty(p)) {
-                    return Reflect.set(target, p, newValue, receiver);
-                }
-
-                target.bind.call(
-                    receiver,
-                    p as string,
-                    typeof newValue === 'function' && !isFunctionConstructor(newValue)
-                        ? newValue
-                        : function () {
-                              return newValue;
-                          }
-                );
-
-                return true;
-            },
-            deleteProperty(target, p): boolean {
-                magicHasIsEnabled = false;
-                const exists = Reflect.has(target, p);
-                magicHasIsEnabled = true;
-
-                if (exists || dontTrapProperty(p)) {
-                    return Reflect.deleteProperty(target, p);
-                }
-
-                target.bindingsMap.delete(p as string);
-                target.instancesMap.delete(p as string);
-                target.resolvedMap.delete(p as string);
-
-                return true;
-            }
-        });
-    }
 
     /**
      * Define a contextual binding.

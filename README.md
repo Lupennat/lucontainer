@@ -51,7 +51,6 @@ Lucontainer requires a modern JavaScript engine with support for:
 -   [Reflect metadata](https://rbuckton.github.io/reflect-metadata)
 -   [Map](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Map)
 -   [Set](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Set)
--   [Proxy](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Proxy)
 
 > **Warning**
 > **The `reflect-metadata` polyfill should be imported only once in your entire application** because the Reflect object is meant to be a global singleton.
