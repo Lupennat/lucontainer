@@ -3,7 +3,6 @@
 import { ReflectionParameter } from '../../types';
 import {
     arrayWrap,
-    dontTrapProperty,
     getParameterClass,
     getParametersDefinition,
     isFunctionConstructor,
@@ -123,33 +122,6 @@ describe('Util', () => {
         obj = JSON.parse(JSON.stringify(obj));
         expect(arrayWrap(obj)).toEqual([obj]);
         expect(arrayWrap(obj)[0]).toEqual(obj);
-    });
-
-    it('Works Dont Trap Property', () => {
-        expect(dontTrapProperty('then')).toBeTruthy();
-        expect(dontTrapProperty('catch')).toBeTruthy();
-        expect(dontTrapProperty('finally')).toBeTruthy();
-        expect(dontTrapProperty('arguments')).toBeTruthy();
-        expect(dontTrapProperty('prototype')).toBeTruthy();
-        expect(dontTrapProperty('constructor')).toBeTruthy();
-        expect(dontTrapProperty('toJSON')).toBeTruthy();
-        expect(dontTrapProperty('#private')).toBeTruthy();
-        expect(dontTrapProperty(Symbol.asyncIterator)).toBeTruthy();
-        expect(dontTrapProperty(Symbol.hasInstance)).toBeTruthy();
-        expect(dontTrapProperty(Symbol.isConcatSpreadable)).toBeTruthy();
-        expect(dontTrapProperty(Symbol.iterator)).toBeTruthy();
-        expect(dontTrapProperty(Symbol.match)).toBeTruthy();
-        expect(dontTrapProperty(Symbol.matchAll)).toBeTruthy();
-        expect(dontTrapProperty(Symbol.replace)).toBeTruthy();
-        expect(dontTrapProperty(Symbol.search)).toBeTruthy();
-        expect(dontTrapProperty(Symbol.split)).toBeTruthy();
-        expect(dontTrapProperty(Symbol.species)).toBeTruthy();
-        expect(dontTrapProperty(Symbol.toPrimitive)).toBeTruthy();
-        expect(dontTrapProperty(Symbol.toStringTag)).toBeTruthy();
-        expect(dontTrapProperty(Symbol.unscopables)).toBeTruthy();
-
-        expect(dontTrapProperty(Symbol.for('regularSymbol'))).toBeFalsy();
-        expect(dontTrapProperty('regularProperty')).toBeFalsy();
     });
 
     it('Works Get Parameter Class', () => {

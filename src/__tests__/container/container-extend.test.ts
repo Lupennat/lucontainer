@@ -12,8 +12,8 @@ class ContainerLazyExtendStub {
 
 describe('Container Extend', () => {
     it('Works Bindings', () => {
-        let container = new Container() as Container & { [key: string]: any };
-        container.foo = 'foo';
+        let container = new Container();
+        container.bind('foo', () => 'foo');
         container.extend('foo', ({ instance: old }: { instance: string }) => {
             return old + 'bar';
         });
@@ -81,11 +81,11 @@ describe('Container Extend', () => {
 
     it('Works Extend Can Be Called Before Bind', () => {
         ContainerLazyExtendStub.initialized = false;
-        const container = new Container() as Container & { [key: string]: any };
+        const container = new Container();
         container.extend('foo', ({ instance: old }: { instance: string }) => {
             return old + 'bar';
         });
-        container.foo = 'foo';
+        container.bind('foo', () => 'foo');
         expect(container.make('foo')).toBe('foobar');
     });
 
@@ -142,8 +142,8 @@ describe('Container Extend', () => {
     });
 
     it('Works Multiple Extends', () => {
-        const container = new Container() as Container & { [key: string]: any };
-        container.foo = 'foo';
+        const container = new Container();
+        container.bind('foo', () => 'foo');
 
         container.extend('foo', ({ instance: old }: { instance: string }) => {
             return old + 'bar';
@@ -154,28 +154,5 @@ describe('Container Extend', () => {
         });
 
         expect(container.make('foo')).toBe('foobarbaz');
-    });
-
-    it('Works Proxy Delete Extend', () => {
-        const container = new Container() as Container & { [key: string]: any };
-        container.bind('foo', () => {
-            return new (class {
-                foo = 'bar';
-            })();
-        });
-
-        container.extend('foo', ({ instance: old }: { instance: { [key: string]: string } }) => {
-            old.bar = 'baz';
-            return old;
-        });
-
-        delete container.foo;
-        container.forgetExtenders('foo');
-
-        container.bind('foo', () => {
-            return 'foo';
-        });
-
-        expect(container.make('foo')).toBe('foo');
     });
 });

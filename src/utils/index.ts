@@ -1,5 +1,4 @@
 export { default as arrayWrap } from './array-wrap';
-export { default as dontTrapProperty } from './dont-trap-property';
 export { default as getParameterClass } from './get-parameter-class';
 export { default as getParametersDefinition } from './get-parameters-definition';
 export { default as isFunctionConstructor } from './is-function-constructor';

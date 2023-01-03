@@ -279,38 +279,9 @@ describe('Container', () => {
         expect(c === container).toBeTruthy();
     });
 
-    it('Works Proxy Handlers', () => {
-        let container = new Container() as Container & { [key: string | symbol]: any };
-        expect(Symbol.for('something') in container).toBeFalsy();
-        container[Symbol.for('something')] = () => {
-            return 'foo';
-        };
-        expect(Symbol.for('something') in container).toBeTruthy();
-        expect(container.get(Symbol.for('something'))).toBe('foo');
-        expect(container[Symbol.for('something')]).not.toBeUndefined();
-        delete container[Symbol.for('something')];
-        expect(Symbol.for('something') in container).toBeFalsy();
-
-        //test proxy set when it's not a closure
-        container = new Container() as Container & { [key: string]: any };
-        container.something = 'text';
-        expect('something' in container).toBeTruthy();
-        expect(container.something).not.toBeUndefined();
-        expect(container.something).toBe('text');
-        delete container.something;
-        expect('something' in container).toBeFalsy();
-
-        container.toJSON = () => {
-            return 'toJSON isReserved it does not register a binding';
-        };
-        expect('toJSON' in container).toBeTruthy();
-        expect(container.toJSON).not.toBe('toJSON isReserved it does not register a binding');
-        expect(JSON.stringify(container)).toBe('"toJSON isReserved it does not register a binding"');
-    });
-
     it('Works Aliases', () => {
-        const container = new Container() as Container & { [key: string]: any };
-        container.foo = 'bar';
+        const container = new Container();
+        container.bind('foo', () => 'bar');
         container.alias('foo', 'baz');
         container.alias('baz', 'bat');
         expect(container.make('foo') === 'bar').toBeTruthy();
@@ -319,8 +290,8 @@ describe('Container', () => {
     });
 
     it('Aliases Fails Loudly With Invalid Arguments', () => {
-        const container = new Container() as Container & { [key: string]: any };
-        container.foo = 'bar';
+        const container = new Container();
+        container.bind('foo', () => 'bar');
         expect(() => {
             container.alias('foo', 'foo');
         }).toThrowError('[foo] is aliased to itself');
@@ -361,12 +332,12 @@ describe('Container', () => {
     });
 
     it('Works Bindings Can Be Overriden', () => {
-        const container = new Container() as Container & { [key: string]: any };
+        const container = new Container();
 
-        container.foo = 'bar';
-        container.foo = 'baz';
+        container.bind('foo', () => 'bar');
+        container.bind('foo', () => 'baz');
 
-        expect(container.foo).toBe('baz');
+        expect(container.get('foo')).toBe('baz');
     });
 
     it('Works Binding An Instance Returns The Instance', () => {
@@ -434,22 +405,6 @@ describe('Container', () => {
         container.bind(Symbol.for('IContainerContractStub'), ContainerConcreteStub);
         expect(container.bound(Symbol.for('IContainerContractStub'))).toBeTruthy();
         expect(container.bound(ContainerConcreteStub)).toBeFalsy();
-    });
-
-    it('Works Proxy Delete Remove Bound Instances', () => {
-        const container = new Container() as Container & { [key: string]: any };
-        container.instance('object', new (class {})());
-        delete container.object;
-
-        expect(container.bound('object')).toBeFalsy();
-    });
-
-    it('Works Bound Instance And Alias Check Via Proxy', () => {
-        const container = new Container() as Container & { [key: string]: any };
-        container.instance('object', new (class {})());
-        container.alias('object', 'alias');
-        expect('object' in container).toBeTruthy();
-        expect('alias' in container).toBeTruthy();
     });
 
     it('Works Rebound Listeners', () => {
@@ -743,14 +698,6 @@ describe('Container', () => {
         expect(() => {
             container.get('Claudio');
         }).toThrowError('Target class [Test] must be decorate with constructable!');
-    });
-
-    it('Can Dynamically Set Service', () => {
-        const container = new Container() as Container & { [key: string]: any };
-        expect('name' in container).toBeFalsy();
-        container.name = 'Claudio';
-        expect('name' in container).toBeTruthy();
-        expect(container.name).toBe('Claudio');
     });
 
     it('Unknown Entry Throws Error', () => {
