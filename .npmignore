@@ -23,6 +23,7 @@ typescript/
 .nvmrc
 .publishrc
 .prettierrc
+.snyk
 
 # Lock files
 package-lock.json
